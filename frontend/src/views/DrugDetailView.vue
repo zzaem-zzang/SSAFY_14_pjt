@@ -1,34 +1,38 @@
 <template>
-  <div class="detail-wrapper">
-    <div v-if="loading" class="info">불러오는 중...</div>
+  <div class="detail-container">
+    <div v-if="loading" class="loading">정보를 불러오고 있습니다...</div>
 
-    <div v-else-if="error" class="info error">
-      존재하지 않는 의약품입니다.
-      <button @click="goHome">홈으로</button>
+    <div v-else-if="error" class="error-view">
+      <h3>존재하지 않는 의약품입니다.</h3>
+      <button @click="goHome">홈으로 돌아가기</button>
     </div>
 
-    <!-- 💊 상세 카드 -->
-    <div v-else class="drug-card">
-      <h1 class="title">💊 {{ drug.name }}</h1>
+    <div v-else class="info-card">
+      <div class="card-header">
+        <span class="category">의약품 상세정보</span>
+        <h1 class="drug-title">{{ drug.name }}</h1>
+      </div>
 
-      <section>
-        <h3>📌 효능</h3>
-        <p>{{ drug.effect || '정보 없음' }}</p>
-      </section>
+      <div class="card-body">
+        <section class="info-section">
+          <h3>📌 효능 및 효과</h3>
+          <p>{{ drug.effect || '정보 없음' }}</p>
+        </section>
 
-      <section>
-        <h3>📖 복용 방법</h3>
-        <p>{{ drug.usage || '정보 없음' }}</p>
-      </section>
+        <section class="info-section">
+          <h3>📖 용법 및 용량</h3>
+          <p>{{ drug.usage || '정보 없음' }}</p>
+        </section>
 
-      <section>
-        <h3>⚠️ 주의사항</h3>
-        <p>{{ drug.warning || '정보 없음' }}</p>
-      </section>
+        <section class="info-section warning">
+          <h3>⚠️ 주의사항</h3>
+          <p>{{ drug.warning || '정보 없음' }}</p>
+        </section>
+      </div>
 
-      <button class="back-btn" @click="goHome">
-        ← 검색으로 돌아가기
-      </button>
+      <div class="card-footer">
+        <button class="back-btn" @click="goHome">목록으로</button>
+      </div>
     </div>
   </div>
 </template>
@@ -40,7 +44,6 @@ import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
-
 const drug = ref(null)
 const loading = ref(true)
 const error = ref(false)
@@ -50,86 +53,88 @@ onMounted(async () => {
     const res = await api.get(`/drugs/${route.params.id}/`)
     drug.value = res.data
   } catch (err) {
-    console.error('상세 조회 실패', err)
     error.value = true
   } finally {
     loading.value = false
   }
 })
 
-const goHome = () => {
-  router.push('/')
-}
+const goHome = () => router.push('/')
 </script>
 
 <style scoped>
-.detail-wrapper {
+.detail-container {
   display: flex;
   justify-content: center;
-  padding: 40px 16px;
+  padding-top: 20px;
 }
 
-/* 카드 */
-.drug-card {
-  max-width: 600px;
+.info-card {
   width: 100%;
-  background: #ffffff;
-  padding: 24px;
-  border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  max-width: 700px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+  overflow: hidden;
 }
 
-/* 제목 */
-.title {
-  margin-bottom: 20px;
-  font-size: 24px;
-}
-
-/* 섹션 */
-section {
-  margin-bottom: 20px;
-}
-
-section h3 {
-  margin-bottom: 8px;
-  font-size: 16px;
-  color: #4f46e5;
-}
-
-section p {
-  line-height: 1.6;
-  white-space: pre-line; /* 줄바꿈 유지 */
-}
-
-/* 버튼 */
-.back-btn {
-  margin-top: 24px;
-  width: 100%;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  background: #4f46e5;
+.card-header {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: white;
-  font-size: 15px;
+  padding: 40px 30px;
+}
+
+.category {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.drug-title {
+  margin: 10px 0 0 0;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.card-body { padding: 30px; }
+
+.info-section { margin-bottom: 30px; }
+.info-section h3 {
+  color: #4f46e5;
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 8px;
+  display: inline-block;
+}
+
+.info-section p {
+  line-height: 1.7;
+  color: #475569;
+  white-space: pre-line;
+}
+
+.info-section.warning h3 { color: #dc2626; }
+.info-section.warning p { background: #fef2f2; padding: 15px; border-radius: 8px; color: #991b1b; }
+
+.card-footer {
+  padding: 20px 30px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  text-align: right;
+}
+
+.back-btn {
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   cursor: pointer;
+  color: #64748b;
+  font-weight: 600;
 }
+.back-btn:hover { background: #f1f5f9; color: #334155; }
 
-.back-btn:hover {
-  background: #4338ca;
-}
-
-/* 안내 */
-.info {
-  font-size: 16px;
-  color: #666;
-}
-
-.info.error {
-  color: #dc2626;
-}
-
-.info button {
-  margin-top: 12px;
-  padding: 8px 12px;
-}
+.loading, .error-view { text-align: center; margin-top: 50px; color: #64748b; }
 </style>

@@ -6,6 +6,7 @@ import PostDetailView from '@/views/PostDetailView.vue'
 import PostCreateView from '@/views/PostCreateView.vue'
 import PostEditView from '@/views/PostEditView.vue'
 import LoginView from '@/views/LoginView.vue'
+import SignUpView from '@/views/SignUpView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +18,7 @@ const router = createRouter({
     { path: '/posts/:id/edit', name: 'PostEdit', component: PostEditView },
     { path: '/drugs/:id', component: DrugDetailView },
     { path: '/login', name: 'Login', component: LoginView },
+    { path: '/signup', name: 'SignUp', component: SignUpView },
   ],
 })
 

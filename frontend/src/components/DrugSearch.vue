@@ -1,50 +1,43 @@
 <template>
-  <div class="section">
-    <h2>의약품 검색</h2>
-
-    <!-- 🔍 검색창 -->
-    <div class="search-box">
+  <section class="search-section">
+    <div class="search-bar">
       <input
         v-model="keyword"
-        placeholder="약 이름을 입력하세요"
+        placeholder="약 이름(예: 타이레놀)을 입력하세요"
         @keyup.enter="search"
       />
-      <button @click="search">검색</button>
+      <button @click="search" class="btn-search">검색</button>
     </div>
 
-    <!-- 🔄 로딩 -->
-    <p v-if="loading" class="info">검색 중입니다...</p>
+    <div v-if="loading" class="status-msg">
+      <span class="spinner"></span> 검색 중입니다...
+    </div>
 
-    <!-- 🧾 검색 결과 카드 -->
-    <div v-if="drugs.length" class="card-list">
+    <div v-if="errorMessage" class="error-msg">
+      ⚠️ {{ errorMessage }}
+    </div>
+
+    <div v-if="drugs.length" class="result-grid">
       <div
         class="drug-card"
         v-for="drug in drugs"
         :key="drug.id"
+        @click="goDetail(drug.id)"
       >
-        <h3>{{ drug.name }}</h3>
-
-        <span
-          class="badge"
-          :class="drug.created ? 'new' : 'exist'"
-        >
-          {{ drug.created ? '신규 저장' : '기존 데이터' }}
-        </span>
-
-        <button @click="goDetail(drug.id)">
-          상세보기
-        </button>
+        <div class="card-header">
+          <h3>{{ drug.name }}</h3>
+          <span class="badge" :class="drug.created ? 'new' : 'exist'">
+            {{ drug.created ? '신규' : '정보' }}
+          </span>
+        </div>
+        <p class="click-hint">자세히 보기 &rarr;</p>
       </div>
     </div>
 
-    <!-- 📭 결과 없음 -->
-    <p v-else-if="searched && !loading && !errorMessage" class="info">
+    <div v-else-if="searched && !loading && !errorMessage" class="status-msg empty">
       검색 결과가 없습니다.
-    </p>
-
-    <!-- ❗ 오류 메시지 -->
-    <p v-if="errorMessage" class="error">오류: {{ errorMessage }}</p>
-  </div>
+    </div>
+  </section>
 </template>
 
 <script setup>
@@ -53,7 +46,6 @@ import api from '@/api'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-
 const keyword = ref('')
 const drugs = ref([])
 const loading = ref(false)
@@ -61,121 +53,115 @@ const searched = ref(false)
 const errorMessage = ref('')
 
 const search = async () => {
-  if (!keyword.value) return
-
+  if (!keyword.value.trim()) return
   loading.value = true
   searched.value = true
-
+  errorMessage.value = ''
+  
   try {
-    const res = await api.get(
-      `/drugs/save/?name=${encodeURIComponent(keyword.value)}`
-    )
+    const res = await api.get(`/drugs/save/?name=${encodeURIComponent(keyword.value)}`)
     drugs.value = res.data.saved || []
-    errorMessage.value = ''
   } catch (err) {
-    console.error('검색 실패', err)
-    drugs.value = []
-    // 사용자에게 보일 수 있는 에러 메시지 추출
-    const serverMessage = err.response?.data?.error || err.response?.data?.detail || err.message
-    errorMessage.value = serverMessage
+    errorMessage.value = err.response?.data?.detail || '검색 중 오류가 발생했습니다.'
+  } finally {
+    loading.value = false
   }
-
-  loading.value = false
 }
 
-const goDetail = (id) => {
-  router.push(`/drugs/${id}`)
-}
+const goDetail = (id) => router.push(`/drugs/${id}`)
 </script>
 
 <style scoped>
-.section {
-  margin-bottom: 40px;
-}
+.search-section { width: 100%; }
 
-/* 검색 영역 */
-.search-box {
+/* 검색창 스타일 */
+.search-bar {
   display: flex;
-  gap: 8px;
-  margin: 12px 0;
+  gap: 12px;
+  background: white;
+  padding: 8px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
 }
 
 input {
   flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+  border: none;
+  font-size: 1rem;
+  padding: 12px 16px;
+  outline: none;
+  border-radius: 12px;
 }
 
-button {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: none;
+.btn-search {
   background: #4f46e5;
   color: white;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #4338ca;
-}
-
-/* 카드 리스트 */
-.card-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  margin-top: 20px;
-}
-
-/* 카드 */
-.drug-card {
-  background: #ffffff;
-  padding: 16px;
+  border: none;
+  padding: 0 24px;
   border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-search:hover { background: #4338ca; }
+
+/* 결과 그리드 */
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 30px;
 }
 
-.drug-card h3 {
-  margin: 0;
-  font-size: 16px;
+.drug-card {
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-/* 배지 */
+.drug-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border-color: #4f46e5;
+}
+
+.card-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+  color: #1e293b;
+}
+
 .badge {
-  width: fit-content;
+  font-size: 0.75rem;
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 12px;
   font-weight: 600;
 }
+.badge.new { background: #dcfce7; color: #166534; }
+.badge.exist { background: #f1f5f9; color: #475569; }
 
-.badge.new {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.badge.exist {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-/* 안내 문구 */
-.info {
-  margin-top: 16px;
-  color: #777;
-}
-
-/* 오류 메시지 */
-.error {
+.click-hint {
   margin-top: 12px;
-  color: #b91c1c;
-  background: #fff5f5;
-  padding: 10px;
+  font-size: 0.9rem;
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+.status-msg {
+  text-align: center;
+  margin-top: 40px;
+  color: #64748b;
+}
+.error-msg {
+  margin-top: 20px;
+  padding: 12px;
+  background: #fef2f2;
+  color: #dc2626;
   border-radius: 8px;
-  border: 1px solid #fecaca;
+  text-align: center;
 }
 </style>

@@ -1,89 +1,124 @@
 <template>
-  <div class="container">
-    <header class="header">
-      <div class="header-inner">
-        <h1>💊 의약품 서비스</h1>
-        <nav class="nav">
+  <div class="app-container">
+    <nav class="navbar">
+      <div class="nav-content">
+        <router-link to="/" class="logo">💊 MediSearch</router-link>
+        <div class="nav-links">
           <router-link to="/">홈</router-link>
-          <router-link to="/posts">게시글</router-link>
-          <router-link to="/posts/create" v-if="auth.isLogin">글쓰기</router-link>
-          <span class="spacer"></span>
-          <template v-if="auth.isLogin">
-            <span class="user">{{ auth.user.username }}</span>
-            <button class="link-btn" @click="logout">로그아웃</button>
-          </template>
-          <router-link v-else to="/login">로그인</router-link>
-        </nav>
+          <router-link :to="{ name: 'PostList' }">커뮤니티</router-link>
+          <!-- 로그인 완료 상태-->
+          <div v-if="auth.isLogin" class="user-menu">
+            <span>{{ auth.user?.username }}님</span>
+            <button @click="handleLogout" class="logout-btn">로그아웃</button>
+          </div>
+          <!-- 비로그인 상태 -->
+          <div v-else class="auth-links">
+            <router-link :to="{ name: 'Login' }" class="login-btn">
+            로그인
+          </router-link>
+          <router-link :to="{ name: 'SignUp' }" class="signup-btn">
+            회원가입
+          </router-link>
+        </div>
       </div>
-    </header>
-
-    <router-view />
+    </div>
+    </nav>
+    <main class="main-content">
+      <router-view />
+    </main>
   </div>
 </template>
 
 <script setup>
 import { useAuthStore } from '@/stores/auth'
-import { storeToRefs } from 'pinia'
-const auth = useAuthStore()
-const { isLogin, user } = storeToRefs(auth)
+import { useRouter } from 'vue-router'
 
-function logout() {
+const auth = useAuthStore()
+const router = useRouter()
+
+const handleLogout = () => {
   auth.logout()
+  router.push({ name: 'Login' })
 }
 </script>
 
 <style>
+/* 🌍 전역 스타일 (Global CSS) */
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  background-color: #f5f6f8;
-  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  background-color: #f8fafc;
+  color: #334155;
 }
 
-.container {
-  max-width: 1024px;
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; }
+
+/* 레이아웃 */
+.navbar {
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 0 20px;
+}
+
+.nav-content {
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 24px;
-}
-
-.header {
-  margin-bottom: 24px;
-}
-
-.header-inner {
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
 }
 
-h1 {
-  margin: 0;
+.logo {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #4f46e5;
 }
 
-.nav {
+.nav-links {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 24px;
+  font-weight: 500;
+  color: #64748b;
 }
 
-.nav a {
-  color: #333;
-  text-decoration: none;
-}
+.nav-links a:hover { color: #4f46e5; }
+.nav-links a.router-link-active { color: #4f46e5; font-weight: 700; }
 
-.spacer {
-  width: 16px;
-}
-
-.user {
-  font-weight: 600;
-  margin-right: 8px;
-}
-
-.link-btn {
-  border: none;
-  background: transparent;
-  color: #4f46e5;
+.login-btn, .logout-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
   cursor: pointer;
+  border: none;
 }
+
+.login-btn {
+  background: #4f46e5;
+  color: white;
+}
+
+.logout-btn {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.main-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  min-height: 80vh;
+}
+
+
+
 </style>
