@@ -6,9 +6,27 @@ import logging
 
 from .models import Drug, Symptom
 from .utils import fetch_drug_from_api
-from .serializers import DrugSerializer,SymptomSerializer
+from .serializers import DrugSerializer,SymptomSerializer, DrugCommentSerializer
 
 logger = logging.getLogger(__name__)
+
+
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import permission_classes
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_drug_comment(request, pk):
+    drug = get_object_or_404(Drug, pk=pk)
+
+    serializer = DrugCommentSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save(
+        author=request.user,
+        drug=drug
+    )
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 
 @api_view(['GET'])
@@ -119,3 +137,5 @@ def symptom_list(request):
     symptoms = Symptom.objects.all()
     serializer = SymptomSerializer(symptoms, many=True)
     return Response(serializer.data)
+
+

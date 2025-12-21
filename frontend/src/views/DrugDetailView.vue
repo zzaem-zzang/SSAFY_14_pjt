@@ -12,6 +12,51 @@
         <span class="category">의약품 상세정보</span>
         <h1 class="drug-title">{{ drug.name }}</h1>
       </div>
+      <!-- ⭐ 평균 별점 -->
+      <div v-if="drug.avg_rating" class="avg-rating">
+        ⭐ 평균 평점 {{ drug.avg_rating.toFixed(1) }} / 5
+      </div>
+
+      <!-- 💬 리뷰 섹션 -->
+      <div class="review-card">
+        <h3>💬 사용자 리뷰</h3>
+
+        <!-- 리뷰 목록 -->
+        <ul v-if="drug.comments.length">
+          <li v-for="c in drug.comments" :key="c.id" class="review-item">
+            <div class="review-header">
+              <strong>{{ c.author.username }}</strong>
+              <span v-if="c.rating" class="review-rating">
+                <span v-for="i in 5" :key="i" :class="{ active: i <= c.rating }">★</span>
+              </span>
+            </div>
+            <p>{{ c.content }}</p>
+          </li>
+        </ul>
+
+        <p v-else class="empty-review">아직 리뷰가 없습니다.</p>
+
+        <!-- 리뷰 작성 -->
+        <div v-if="auth.isLogin" class="review-form">
+
+          <!-- ⭐ 별점 입력 -->
+          <div class="star-rating">
+            <span v-for="i in 5" :key="i" class="star" :class="{ active: i <= (hoverRating || rating) }"
+              @mouseenter="setHover(i)" @mouseleave="clearHover" @click="setRating(i)">
+              ★
+            </span>
+          </div>
+
+          <textarea v-model="newComment" placeholder="이 약에 대한 경험을 남겨주세요"></textarea>
+
+          <button @click="createComment">리뷰 등록</button>
+        </div>
+
+        <p v-else class="login-hint">
+          리뷰를 작성하려면 로그인하세요.
+        </p>
+      </div>
+
 
       <div class="card-body">
         <section class="info-section">
@@ -59,6 +104,46 @@ onMounted(async () => {
   }
 })
 
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+
+const newComment = ref('')
+const rating = ref(0)
+const hoverRating = ref(0)
+
+function setRating(val) {
+  rating.value = val
+}
+function setHover(val) {
+  hoverRating.value = val
+}
+function clearHover() {
+  hoverRating.value = 0
+}
+
+// 댓글 작성
+async function createComment() {
+  if (!newComment.value.trim()) return
+
+  try {
+    await api.post(`/drugs/${route.params.id}/comments/`, {
+      content: newComment.value,
+      rating: rating.value || null
+    })
+    newComment.value = ''
+    rating.value = 0
+
+    // 댓글 다시 불러오기
+    const res = await api.get(`/drugs/${route.params.id}/`)
+    drug.value = res.data
+  } catch (e) {
+    alert('리뷰 작성 실패')
+  }
+}
+
+
+
 const goHome = () => router.push('/')
 </script>
 
@@ -74,7 +159,7 @@ const goHome = () => router.push('/')
   max-width: 700px;
   background: white;
   border-radius: 20px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
@@ -97,9 +182,14 @@ const goHome = () => router.push('/')
   font-weight: 800;
 }
 
-.card-body { padding: 30px; }
+.card-body {
+  padding: 30px;
+}
 
-.info-section { margin-bottom: 30px; }
+.info-section {
+  margin-bottom: 30px;
+}
+
 .info-section h3 {
   color: #4f46e5;
   font-size: 1.1rem;
@@ -115,8 +205,16 @@ const goHome = () => router.push('/')
   white-space: pre-line;
 }
 
-.info-section.warning h3 { color: #dc2626; }
-.info-section.warning p { background: #fef2f2; padding: 15px; border-radius: 8px; color: #991b1b; }
+.info-section.warning h3 {
+  color: #dc2626;
+}
+
+.info-section.warning p {
+  background: #fef2f2;
+  padding: 15px;
+  border-radius: 8px;
+  color: #991b1b;
+}
 
 .card-footer {
   padding: 20px 30px;
@@ -134,7 +232,88 @@ const goHome = () => router.push('/')
   color: #64748b;
   font-weight: 600;
 }
-.back-btn:hover { background: #f1f5f9; color: #334155; }
 
-.loading, .error-view { text-align: center; margin-top: 50px; color: #64748b; }
+.back-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.loading,
+.error-view {
+  text-align: center;
+  margin-top: 50px;
+  color: #64748b;
+}
+
+.avg-rating {
+  margin: 20px auto;
+  text-align: center;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.review-card {
+  max-width: 700px;
+  margin: 30px auto;
+  background: white;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+}
+
+.review-item {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 15px 0;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.review-rating span {
+  color: #e5e7eb;
+}
+.review-rating span.active {
+  color: #facc15;
+}
+
+.star-rating {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.star {
+  font-size: 1.8rem;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+.star.active {
+  color: #facc15;
+}
+
+.review-form textarea {
+  width: 100%;
+  min-height: 80px;
+  margin: 10px 0;
+}
+
+.review-form button {
+  background: #4f46e5;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.empty-review,
+.login-hint {
+  text-align: center;
+  color: #94a3b8;
+  margin-top: 15px;
+}
+
 </style>

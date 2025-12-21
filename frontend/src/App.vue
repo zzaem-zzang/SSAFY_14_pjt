@@ -13,12 +13,8 @@
           </div>
           <!-- 비로그인 상태 -->
           <div v-else class="auth-links">
-            <router-link :to="{ name: 'Login' }" class="login-btn">
-            로그인
-          </router-link>
-          <router-link :to="{ name: 'SignUp' }" class="signup-btn">
-            회원가입
-          </router-link>
+            <router-link :to="{ name: 'Login' }" class="login-btn">로그인</router-link>
+          <router-link :to="{ name: 'SignUp' }" class="signup-btn">회원가입</router-link>
         </div>
       </div>
     </div>
@@ -91,8 +87,8 @@ button { font-family: inherit; }
   color: #64748b;
 }
 
-.nav-links a:hover { color: #4f46e5; }
-.nav-links a.router-link-active { color: #4f46e5; font-weight: 700; }
+.nav-links a:hover { color: black; }
+.nav-links a.router-link-active {  color : black ;font-weight: 700; }
 
 .login-btn, .logout-btn {
   padding: 8px 16px;
@@ -119,6 +115,11 @@ button { font-family: inherit; }
   min-height: 80vh;
 }
 
+.auth-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;   /* ← 이 값으로 간격 조절 */
+}
 
 
 </style>

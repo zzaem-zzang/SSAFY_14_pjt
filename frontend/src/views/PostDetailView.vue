@@ -1,13 +1,20 @@
 <template>
   <div class="post-detail-container">
     <div v-if="post" class="content-wrapper">
-      
+
       <article class="post-card">
         <div class="post-header">
           <h1 class="title">{{ post.title }}</h1>
           <div class="meta">
             <span class="author">✍️ {{ post.author.username }}</span>
-            </div>
+            <span v-if="post.avg_rating" class="rating">
+              ⭐ {{ post.avg_rating.toFixed(1) }} / 5
+            </span>
+            <span v-else class="rating empty">
+              ⭐ 아직 별점 없음
+            </span>
+          </div>
+
         </div>
 
         <div class="post-body" v-html="post.content"></div>
@@ -20,7 +27,7 @@
 
       <section class="comments-section">
         <h3>댓글 <span class="count">{{ post.comments.length }}</span></h3>
-        
+
         <ul class="comment-list">
           <li v-for="c in post.comments" :key="c.id" class="comment-item">
             <div class="comment-author">{{ c.author.username }}</div>
@@ -32,13 +39,25 @@
         </ul>
 
         <div v-if="auth.isLogin" class="comment-form">
-          <textarea
-            v-model="newComment"
-            placeholder="댓글을 입력하세요..."
-            rows="3"
-          ></textarea>
-          <button @click="createComment" class="btn-submit">등록</button>
+
+          <!-- ⭐ 별점 입력 -->
+          <div class="star-rating">
+            <span v-for="i in 5" :key="i" class="star" :class="{
+              active: i <= (hoverRating || rating)
+            }" @mouseenter="setHover(i)" @mouseleave="clearHover" @click="setRating(i)">
+              ★
+            </span>
+          </div>
+
+
+          <textarea v-model="newComment" placeholder="댓글을 입력하세요..." rows="3"></textarea>
+
+          <button @click="createComment" class="btn-submit">
+            등록
+          </button>
         </div>
+
+
         <div v-else class="login-plz">
           댓글을 작성하려면 <router-link :to="{ name: 'Login' }">로그인</router-link>이 필요합니다.
         </div>
@@ -60,7 +79,22 @@ const router = useRouter()
 const post = ref(null)
 const newComment = ref('')
 const auth = useAuthStore()
+const rating = ref(0)
+const hoverRating = ref(0)  // 마우스 올렸을 때 임시 별점
 
+
+// 별 클릭
+function setRating(value) {
+  rating.value = value
+}
+
+function setHover(value) {
+  hoverRating.value = value
+}
+
+function clearHover() {
+  hoverRating.value = 0
+}
 // 게시글 불러오기
 async function load() {
   try {
@@ -79,7 +113,7 @@ const canEdit = computed(() => auth.isLogin && post.value && (auth.user.id === p
 
 // 게시글 삭제
 async function deletePost() {
-  if(!confirm('정말 삭제하시겠습니까?')) return
+  if (!confirm('정말 삭제하시겠습니까?')) return
   try {
     await api.delete(`/posts/${route.params.id}/`)
     router.push({ name: 'PostList' })
@@ -91,14 +125,23 @@ async function deletePost() {
 // 댓글 작성
 async function createComment() {
   if (!newComment.value.trim()) return
+
   try {
-    await api.post(`/posts/${route.params.id}/comments/`, { content: newComment.value })
+    await api.post(`/posts/${route.params.id}/comments/`, {
+      content: newComment.value,
+      rating: rating.value || null
+    })
     await load()
     newComment.value = ''
+    rating.value = 0
   } catch (err) {
     alert('댓글 작성 실패')
   }
 }
+
+
+
+
 
 onMounted(load)
 </script>
@@ -124,8 +167,16 @@ onMounted(load)
   margin-bottom: 30px;
 }
 
-.title { margin: 0 0 10px; font-size: 2rem; color: #1e293b; }
-.meta { color: #64748b; font-size: 0.95rem; }
+.title {
+  margin: 0 0 10px;
+  font-size: 2rem;
+  color: #1e293b;
+}
+
+.meta {
+  color: #64748b;
+  font-size: 0.95rem;
+}
 
 .post-body {
   line-height: 1.8;
@@ -150,14 +201,35 @@ onMounted(load)
   cursor: pointer;
   border: none;
 }
-.btn-edit { background: #f1f5f9; color: #475569; }
-.btn-edit:hover { background: #e2e8f0; }
-.btn-delete { background: #fee2e2; color: #dc2626; }
-.btn-delete:hover { background: #fecaca; }
+
+.btn-edit {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-edit:hover {
+  background: #e2e8f0;
+}
+
+.btn-delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.btn-delete:hover {
+  background: #fecaca;
+}
 
 /* 댓글 스타일 */
-.comments-section h3 { margin-bottom: 20px; color: #1e293b; }
-.count { color: #4f46e5; margin-left: 4px; }
+.comments-section h3 {
+  margin-bottom: 20px;
+  color: #1e293b;
+}
+
+.count {
+  color: #4f46e5;
+  margin-left: 4px;
+}
 
 .comment-list {
   list-style: none;
@@ -173,22 +245,102 @@ onMounted(load)
   border: 1px solid #f1f5f9;
 }
 
-.comment-author { font-weight: 700; color: #334155; margin-bottom: 4px; font-size: 0.9rem; }
-.comment-text { color: #475569; }
-.empty-comment { text-align: center; color: #94a3b8; padding: 20px; }
-
-.comment-form { display: flex; flex-direction: column; gap: 10px; }
-textarea {
-  width: 100%; padding: 16px; border-radius: 12px;
-  border: 1px solid #e2e8f0; resize: vertical; outline: none;
+.comment-author {
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
 }
-textarea:focus { border-color: #4f46e5; }
+
+.comment-text {
+  color: #475569;
+}
+
+.empty-comment {
+  text-align: center;
+  color: #94a3b8;
+  padding: 20px;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+textarea {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  resize: vertical;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: #4f46e5;
+}
 
 .btn-submit {
   align-self: flex-end;
-  background: #4f46e5; color: white; border: none;
-  padding: 10px 24px; border-radius: 8px; cursor: pointer;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
 }
-.login-plz { text-align: center; color: #64748b; margin-top: 20px; }
-.login-plz a { color: #4f46e5; font-weight: 600; text-decoration: underline; }
+
+.login-plz {
+  text-align: center;
+  color: #64748b;
+  margin-top: 20px;
+}
+
+.login-plz a {
+  color: #4f46e5;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.rating {
+  margin-left: 12px;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.rating.empty {
+  color: #94a3b8;
+}
+
+.rating-select {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+
+.star-rating {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.star {
+  font-size: 1.8rem;
+  color: #e5e7eb;
+  /* 회색 별 */
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.star.active {
+  color: #facc15;
+  /* 노란 별 */
+}
+
+.star:hover {
+  color: #fde047;
+}
 </style>
