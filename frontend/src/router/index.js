@@ -11,7 +11,7 @@ import SignUpView from '@/views/SignUpView.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: HomeView },
+    { path: '/', name:'home', component: HomeView },
     { path: '/posts', name: 'PostList', component: PostListView },
     { path: '/posts/create', name: 'PostCreate', component: PostCreateView },
     { path: '/posts/:id', name: 'PostDetail', component: PostDetailView },

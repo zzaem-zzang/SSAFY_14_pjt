@@ -486,10 +486,10 @@ Visual Requirements:
 Style: flat medical illustration, infographic, clean, professional
 """
 
+
     logger.info(f"=== 이미지 생성 시작: {drug.name} ===")
     logger.info(f"프롬프트 길이: {len(image_prompt)} chars")
     
-    # 3️⃣ Gemini API 호출 (핵심: responseModalities를 ["Text", "Image"]로 지정)
     gemini_payload = {
         "contents": [{
             "parts": [{
@@ -528,8 +528,10 @@ Style: flat medical illustration, infographic, clean, professional
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
+
         data = res.json()
         logger.info(f"응답 키: {list(data.keys())}")
+
 
         # 4️⃣ base64 이미지 추출
         if "candidates" not in data:
@@ -573,6 +575,7 @@ Style: flat medical illustration, infographic, clean, professional
                 "text_preview": text_content
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+
         )
         
     except requests.exceptions.Timeout:
@@ -581,14 +584,15 @@ Style: flat medical illustration, infographic, clean, professional
             {"detail": "이미지 생성 시간 초과"},
             status=status.HTTP_504_GATEWAY_TIMEOUT
         )
-    
+
     except requests.exceptions.RequestException as e:
         logger.exception("Gemini API 네트워크 에러")
         return Response(
             {"detail": f"네트워크 오류: {str(e)}"},
             status=status.HTTP_502_BAD_GATEWAY
         )
-    
+
+
     except Exception as e:
         logger.exception(f"예상치 못한 오류 - Drug ID: {pk}")
         return Response(
