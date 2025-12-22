@@ -67,3 +67,18 @@ class DrugReaction(models.Model):
 
     class Meta:
         unique_together = ('user', 'drug')
+
+
+# models.py
+class DrugAiSummary(models.Model):
+    drug = models.OneToOneField(
+        Drug,
+        on_delete=models.CASCADE,
+        related_name="ai_summary"
+    )
+    one_liner = models.CharField(max_length=255, blank=True, default="")
+    easy_explain = models.TextField(blank=True, default="")
+    key_points = models.JSONField(default=list, blank=True)
+    cautions = models.JSONField(default=list, blank=True)
+    when_to_see_doctor = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)

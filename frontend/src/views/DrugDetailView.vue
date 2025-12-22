@@ -42,6 +42,44 @@
           <p>{{ drug.warning || '정보 없음' }}</p>
         </section>
       </div>
+      <!-- 🤖 AI 요약 섹션 -->
+      <section class="ai-card">
+        <h3>🤖 AI 요약</h3>
+
+        <div v-if="summaryLoading">AI 요약을 불러오는 중...</div>
+
+        <div v-else-if="aiSummary">
+          <p class="one-liner">{{ aiSummary.one_liner }}</p>
+
+          <p class="easy">{{ aiSummary.easy_explain }}</p>
+
+          <ul>
+            <li v-for="(p, i) in aiSummary.key_points" :key="i">✔ {{ p }}</li>
+          </ul>
+
+          <h4>⚠️ 주의사항</h4>
+          <ul>
+            <li v-for="(c, i) in aiSummary.cautions" :key="i">⚠ {{ c }}</li>
+          </ul>
+
+          <h4>🏥 병원에 가야 할 때</h4>
+          <ul>
+            <li v-for="(w, i) in aiSummary.when_to_see_doctor" :key="i">🏥 {{ w }}</li>
+          </ul>
+        </div>
+      </section>
+      <!-- 🖼️ AI 이미지 -->
+      <section class="ai-image">
+        <button @click="generateAiImage" :disabled="imageLoading">
+          {{ imageLoading ? '이미지 생성 중...' : 'AI 이미지 생성' }}
+        </button>
+
+        <p v-if="imageError" class="error">{{ imageError }}</p>
+
+        <div v-if="aiImage" class="image-wrap">
+          <img :src="aiImage" alt="AI 생성 이미지" />
+        </div>
+      </section>
 
       <div class="card-footer">
         <button class="back-btn" @click="goHome">목록으로</button>
@@ -104,6 +142,46 @@ const onImgError = (e) => {
   e.target.src = placeholder
 }
 
+// 🤖 AI 요약
+const aiSummary = ref(null)
+const summaryLoading = ref(false)
+
+// 🖼️ AI 이미지
+const aiImage = ref(null)
+const imageLoading = ref(false)
+const imageError = ref('')
+
+// ai 요약 
+const fetchAiSummary = async () => {
+  summaryLoading.value = true
+  try {
+    const res = await api.get(`/drugs/${route.params.id}/ai-summary/`)
+    aiSummary.value = res.data
+  } catch (e) {
+    console.error('AI 요약 로드 실패', e)
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+// ai 이미지
+const generateAiImage = async () => {
+  imageLoading.value = true
+  imageError.value = ''
+  aiImage.value = null
+
+  try {
+    const res = await api.post(`/drugs/${route.params.id}/ai-image/`)
+    aiImage.value = `data:${res.data.mime_type};base64,${res.data.base64}`
+  } catch (e) {
+    imageError.value = 'AI 이미지 생성에 실패했습니다.'
+  } finally {
+    imageLoading.value = false
+  }
+}
+
+
+
 const route = useRoute()
 const router = useRouter()
 const drug = ref({
@@ -123,6 +201,7 @@ onMounted(async () => {
   try {
     const res = await api.get(`/drugs/${route.params.id}/`)
     drug.value = res.data
+    fetchAiSummary()
   } catch (err) {
     error.value = true
   } finally {
@@ -371,4 +450,42 @@ const goHome = () => {
   /* 좌우 꽉 채움 (핵심) */
   display: block;
 }
+
+.ai-card {
+  margin-top: 30px;
+  padding: 20px;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.one-liner {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+}
+
+.easy {
+  margin-bottom: 12px;
+  color: #475569;
+}
+
+.ai-image button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.ai-image img {
+  margin-top: 16px;
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  background: white;
+  border-radius: 12px;
+}
+
 </style>

@@ -1,22 +1,108 @@
+# ========================
+# DRF 기본
+# ========================
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
+# ========================
+# Django 기본
+# ========================
 from django.shortcuts import get_object_or_404
+from django.conf import settings
 from django.db.models import Avg, Count, Q, F, FloatField, ExpressionWrapper
+
+# ========================
+# 외부 / 유틸
+# ========================
+import json
+import requests
 import logging
-from .models import Drug, Symptom, DrugReaction
+
+# ========================
+# 로컬 앱
+# ========================
+from .models import (
+    Drug,
+    DrugAiSummary,   
+    Symptom,
+    DrugReaction,
+)
 from .utils import fetch_drug_from_api
-from .serializers import DrugSerializer,SymptomSerializer, DrugCommentSerializer, DrugReactionSerializer, DrugDetailSerializer
+from .serializers import (
+    DrugSerializer,
+    SymptomSerializer,
+    DrugCommentSerializer,
+    DrugReactionSerializer,
+    DrugDetailSerializer,
+)
+
 
 logger = logging.getLogger(__name__)
 
+# Gemini 이미지 생성 엔드포인트
+GMS_GEMINI_IMAGE_URL = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent"
+GMS_OPENAI_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions"
+# gpt 호출 함수
+def call_gpt_for_drug_summary(drug):
+    developer_msg = """
+너는 한국어로 약 정보를 쉽게 설명해주는 AI야.
+반드시 JSON만 출력해야 해.
+
+{
+  "one_liner": "",
+  "easy_explain": "",
+  "key_points": [],
+  "cautions": [],
+  "when_to_see_doctor": []
+}
+""".strip()
+
+    user_msg = f"""
+약 이름: {drug.name}
+효능: {drug.effect}
+복용법: {drug.usage}
+주의사항: {drug.warning}
+""".strip()
 
 
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "developer", "content": developer_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.2,
+    }
+
+    r = requests.post(
+        GMS_OPENAI_URL,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {settings.GMS_KEY}",
+        },
+        json=payload,
+        timeout=30,
+    )
+    r.raise_for_status()
+    data = r.json()
+
+    content = data["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
+# ================================
+# 💬 약 댓글 작성 (로그인 필수)
+# ================================
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_drug_comment(request, pk):
+    """
+    POST /drugs/<pk>/comments/
+    - 로그인한 사용자만 댓글 작성 가능
+    - author는 request.user로 강제 지정 (프론트에서 못 바꿈)
+    """
     drug = get_object_or_404(Drug, pk=pk)
 
     serializer = DrugCommentSerializer(data=request.data)
@@ -28,10 +114,18 @@ def create_drug_comment(request, pk):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-
+# ================================
+# 🔍 약 이름으로 검색 + DB 저장
+# ================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def save_drug_by_name(request):
+    """
+    GET /drugs/save/?name=타이레놀
+    - 외부 공공 API 호출
+    - DB에 없으면 저장
+    - 검색 결과 리스트 반환
+    """
     name = request.query_params.get('name')
 
     if not name:
@@ -44,41 +138,46 @@ def save_drug_by_name(request):
     try:
         data = fetch_drug_from_api(name)
     except Exception as e:
-        # 로그에 상세 정보 남김
         logger.exception('외부 API 호출 중 예외 발생')
         err = str(e)
-        # 인증 관련 에러인 경우(401) 보다 명확한 메시지 반환
+
+        # 인증 관련 에러 구분
         if '401' in err or 'Unauthorized' in err or '인증' in err:
-            return Response({'error': '외부 API 인증 실패: E_DRUG_API_KEY를 확인하세요.'}, status=502)
-        return Response({'error': f'외부 API 호출 실패: {err}'}, status=502)
-    
+            return Response(
+                {'error': '외부 API 인증 실패: E_DRUG_API_KEY를 확인하세요.'},
+                status=502
+            )
+
+        return Response(
+            {'error': f'외부 API 호출 실패: {err}'},
+            status=502
+        )
+
     body = data.get('body', {})
     items = body.get('items', [])
 
-   
+    # API 응답이 dict 형태일 경우 보정
     if isinstance(items, dict):
         items = items.get('item', [])
 
-    # 결과가 아예 없을 때도 성공 처리
+    # 검색 결과가 없는 경우도 정상 응답
     if not items:
         return Response(
-            {
-                'message': '검색 결과가 없습니다.',
-                'saved_count': 0
-            },
+            {'message': '검색 결과가 없습니다.', 'saved_count': 0},
             status=200
         )
 
     saved = []
     failed = []
 
-    #  하나라도 있으면 무조건 성공
+    # 2️⃣ 하나라도 성공하면 전체 성공 처리
     for item in items:
         try:
             item_name = item.get('itemName')
             if not item_name:
                 continue
 
+            # 동일 이름의 약이 있으면 재사용
             drug, created = Drug.objects.get_or_create(
                 name=item_name,
                 defaults={
@@ -88,7 +187,7 @@ def save_drug_by_name(request):
                     'image_url': item.get('itemImage', ''),
                 }
             )
-            
+
             saved.append({
                 'id': drug.id,
                 'name': drug.name,
@@ -97,7 +196,7 @@ def save_drug_by_name(request):
             })
 
         except Exception as e:
-            # 👉 개별 실패는 전체 실패 아님
+            # 개별 실패는 전체 실패로 보지 않음
             failed.append(str(e))
 
     return Response(
@@ -105,25 +204,37 @@ def save_drug_by_name(request):
             'saved_count': len(saved),
             'saved': saved,
             'failed_count': len(failed),
-            'image_url': drug.image_url,
         },
         status=200
     )
 
 
-
-# Drug를 상세 조회
+# ================================
+# 📄 약 상세 조회
+# ================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def drug_detail(request, pk):
+    """
+    GET /drugs/<pk>/
+    - 약 상세 정보
+    - 효능 / 용법 / 주의사항 / 평균 평점 / 댓글 포함
+    """
     drug = get_object_or_404(Drug, pk=pk)
-    serializer = DrugDetailSerializer(drug)  # ⭐ 핵심
+    serializer = DrugDetailSerializer(drug)
     return Response(serializer.data)
 
 
+# ================================
+# 🤕 증상 기반 약 추천
+# ================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def recommend_by_symptom(request):
+    """
+    GET /drugs/recommend/?symptom=1
+    - 특정 증상에 연결된 약 목록 반환
+    """
     symptom_id = request.query_params.get('symptom')
 
     if not symptom_id:
@@ -138,24 +249,40 @@ def recommend_by_symptom(request):
         'recommendations': serializer.data
     })
 
+
+# ================================
+# 📋 증상 목록 조회
+# ================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def symptom_list(request):
+    """
+    GET /symptoms/
+    - 전체 증상 목록 반환
+    """
     symptoms = Symptom.objects.all()
     serializer = SymptomSerializer(symptoms, many=True)
     return Response(serializer.data)
 
 
-
-
+# ================================
+# 👍👎 사용자 반응 (도움됐어요)
+# ================================
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def drug_reaction(request, drug_id):
+    """
+    GET  /drugs/<id>/reaction/
+    - 도움됨 / 도움안됨 개수
+    - 로그인 시 내 반응도 함께 반환
+
+    POST /drugs/<id>/reaction/
+    - 로그인 필수
+    - 같은 버튼 다시 누르면 반응 취소
+    """
     drug = get_object_or_404(Drug, pk=drug_id)
 
-    # ----------------------
-    # GET: 반응 개수 + 내 반응
-    # ----------------------
+    # ---------- GET ----------
     if request.method == 'GET':
         summary = (
             DrugReaction.objects
@@ -173,7 +300,6 @@ def drug_reaction(request, drug_id):
         for item in summary:
             data[item['reaction']] = item['count']
 
-        # ⭐ 로그인한 경우에만 내 반응 조회
         if request.user.is_authenticated:
             my = DrugReaction.objects.filter(
                 user=request.user,
@@ -181,11 +307,9 @@ def drug_reaction(request, drug_id):
             ).first()
             data['my_reaction'] = my.reaction if my else None
 
-        return Response(data, status=status.HTTP_200_OK)
+        return Response(data)
 
-    # ----------------------
-    # POST: 로그인 필수
-    # ----------------------
+    # ---------- POST ----------
     if not request.user.is_authenticated:
         return Response(
             {'detail': '로그인이 필요합니다.'},
@@ -215,20 +339,19 @@ def drug_reaction(request, drug_id):
     )
 
     serializer = DrugReactionSerializer(reaction_obj)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.data)
 
 
-
+# ================================
+# 📊 약 목록 + 정렬
+# ================================
 @api_view(['GET'])
 def drug_list(request):
     """
-    약 목록 조회 + 정렬 + 사용자 반응 비율
-    정렬 옵션:
-    - 기본순   : order 없음
-    - 도움순   : order=helpful
-    - 평점순   : order=rating
+    GET /drugs/?order=helpful|rating
+    - 기본순 / 도움순 / 평점순 정렬
+    - 도움됐어요 비율 계산
     """
-
     order = request.query_params.get('order')
 
     drugs = Drug.objects.annotate(
@@ -241,10 +364,8 @@ def drug_list(request):
             'reactions',
             filter=Q(reactions__reaction='unhelpful')
         ),
-    )
-
-    # ⭐ 도움됐어요 비율 (%)
-    drugs = drugs.annotate(
+    ).annotate(
+        # 도움됐어요 비율 (%)
         helpful_ratio=ExpressionWrapper(
             100.0 * F('helpful_count') /
             (F('helpful_count') + F('unhelpful_count')),
@@ -252,7 +373,6 @@ def drug_list(request):
         )
     )
 
-    # 정렬
     if order == 'helpful':
         drugs = drugs.order_by('-helpful_ratio')
     elif order == 'rating':
@@ -262,3 +382,138 @@ def drug_list(request):
 
     serializer = DrugSerializer(drugs, many=True)
     return Response(serializer.data)
+
+# 텍스트
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def drug_ai_summary(request, pk):
+    drug = get_object_or_404(Drug, pk=pk)
+
+    # 1️⃣ 캐시 먼저 확인
+    try:
+        summary = drug.ai_summary
+        return Response({
+            "one_liner": summary.one_liner,
+            "easy_explain": summary.easy_explain,
+            "key_points": summary.key_points,
+            "cautions": summary.cautions,
+            "when_to_see_doctor": summary.when_to_see_doctor,
+            "cached": True,
+            "updated_at": summary.updated_at,
+        })
+    except DrugAiSummary.DoesNotExist:
+        pass
+
+    # 2️⃣ GPT 호출
+    try:
+        parsed = call_gpt_for_drug_summary(drug)
+    except Exception as e:
+        return Response(
+            {
+                "detail": "AI 요약 생성 실패",
+                "error": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    # 3️⃣ DB 저장
+    summary = DrugAiSummary.objects.create(
+        drug=drug,
+        one_liner=parsed.get("one_liner", ""),
+        easy_explain=parsed.get("easy_explain", ""),
+        key_points=parsed.get("key_points", []),
+        cautions=parsed.get("cautions", []),
+        when_to_see_doctor=parsed.get("when_to_see_doctor", []),
+    )
+
+    return Response({
+        "one_liner": summary.one_liner,
+        "easy_explain": summary.easy_explain,
+        "key_points": summary.key_points,
+        "cautions": summary.cautions,
+        "when_to_see_doctor": summary.when_to_see_doctor,
+        "cached": False,
+        "updated_at": summary.updated_at,
+    })
+
+
+
+
+
+# 이미지
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def drug_ai_image(request, pk):
+    drug = get_object_or_404(Drug, pk=pk)
+    
+    # 1️⃣ 요약이 없는 약은 이미지 생성 불가 (선택)
+    try:
+        summary = drug.ai_summary
+    except DrugAiSummary.DoesNotExist:
+        return Response(
+            {"detail": "AI 요약이 먼저 생성되어야 합니다."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 2️⃣ image_prompt를 DB에서 가져오지 말고 여기서 만든다
+    image_prompt = f"""
+image_prompt 작성 규칙:
+- 사람 전신(앞면 기준)이 보이는 **의학 인포그래픽 스타일**
+- 약으로 인해 **증상이 완화되는 부위는 초록색(soft green glow)** 으로 표시
+- **부작용이 생길 수 있는 부위는 빨간색(soft red glow)** 으로 표시
+- 초록/빨강 외 색은 최대한 절제
+- 장기 위치는 실제 인체와 크게 어긋나지 않게
+- 배경은 흰색 또는 매우 연한 회색
+- 공포감·과장된 표현 금지
+- 장기 이름을 표시을 작게 검은 글씨로 표시하기 그리고 한국어로 표시하기
+- 증상이 완화되는 되는 부위에서 멀어질수록 색이 옅어지게 표현
+- 증상이 악화되는 부위에서 멀어질수록 색이 옅어지게 표현
+- flat medical illustration, infographic, clean, high clarity
+- 한국어로 무조건 반드시 작성
+
+작성 규칙:
+- 모든 문장은 부드럽고 단정하지 않은 톤으로 작성한다.
+- 증상을 완화하는 약과 원인을 치료하는 약을 혼동하지 않도록 설명한다.
+- 사용자가 ‘여기까지는 약, 여기부터는 병원’이라고 구분할 수 있게 써라.
+"""
+
+    # 3️⃣ Gemini API 호출
+    gemini_payload = {
+        "contents": [{"parts": [{"text": image_prompt}]}],
+        "responseModalities": ["Text", "Image"]
+    }
+
+    res = requests.post(
+        GMS_GEMINI_IMAGE_URL,
+        params={"key": settings.GMS_KEY},
+        json=gemini_payload,
+        timeout=60,
+    )
+
+    if res.status_code != 200:
+        return Response(
+            {
+            "detail": "Gemini 이미지 생성 요청이 거부되었습니다.",
+            "status_code": res.status_code,
+            "error": res.text,
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    data = res.json()
+
+
+    # 4️⃣ base64 이미지 추출
+    parts = data["candidates"][0]["content"]["parts"]
+    for p in parts:
+        if "inlineData" in p:
+            return Response({
+                "mime_type": p["inlineData"]["mimeType"],
+                "base64": p["inlineData"]["data"],
+            })
+
+    return Response(
+        {"detail": "이미지 생성 실패"},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
+

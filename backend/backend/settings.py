@@ -7,7 +7,7 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-local-test-key')
 E_DRUG_API_KEY = os.getenv('E_DRUG_API_KEY')
-
+GMS_KEY = os.getenv("GMS_KEY")
 # Security: do NOT print secret values (SECRET_KEY, API keys) to logs or stdout.
 # Keep them in a local `.env` (ignored by git) or a secret manager in production.
 
