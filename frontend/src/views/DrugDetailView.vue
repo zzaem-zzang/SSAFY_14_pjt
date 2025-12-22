@@ -12,50 +12,18 @@
         <span class="category">의약품 상세정보</span>
         <h1 class="drug-title">{{ drug.name }}</h1>
       </div>
+
+      <div class="image-wrap">
+        <img :src="drug.image_url || placeholder" @error="onImgError" alt="약 이미지" />
+      </div>
       <!-- ⭐ 평균 별점 -->
-      <div v-if="drug.avg_rating" class="avg-rating">
+      <div v-if="typeof drug.avg_rating === 'number'" class="avg-rating">
+
         ⭐ 평균 평점 {{ drug.avg_rating.toFixed(1) }} / 5
       </div>
 
-      <!-- 💬 리뷰 섹션 -->
-      <div class="review-card">
-        <h3>💬 사용자 리뷰</h3>
-
-        <!-- 리뷰 목록 -->
-        <ul v-if="drug.comments.length">
-          <li v-for="c in drug.comments" :key="c.id" class="review-item">
-            <div class="review-header">
-              <strong>{{ c.author.username }}</strong>
-              <span v-if="c.rating" class="review-rating">
-                <span v-for="i in 5" :key="i" :class="{ active: i <= c.rating }">★</span>
-              </span>
-            </div>
-            <p>{{ c.content }}</p>
-          </li>
-        </ul>
-
-        <p v-else class="empty-review">아직 리뷰가 없습니다.</p>
-
-        <!-- 리뷰 작성 -->
-        <div v-if="auth.isLogin" class="review-form">
-
-          <!-- ⭐ 별점 입력 -->
-          <div class="star-rating">
-            <span v-for="i in 5" :key="i" class="star" :class="{ active: i <= (hoverRating || rating) }"
-              @mouseenter="setHover(i)" @mouseleave="clearHover" @click="setRating(i)">
-              ★
-            </span>
-          </div>
-
-          <textarea v-model="newComment" placeholder="이 약에 대한 경험을 남겨주세요"></textarea>
-
-          <button @click="createComment">리뷰 등록</button>
-        </div>
-
-        <p v-else class="login-hint">
-          리뷰를 작성하려면 로그인하세요.
-        </p>
-      </div>
+      <!-- 👍👎 사용자 반응 버튼 -->
+      <DrugReactionButtons />
 
 
       <div class="card-body">
@@ -80,16 +48,74 @@
       </div>
     </div>
   </div>
+
+
+  <!-- 💬 리뷰 섹션 -->
+  <div class="review-card">
+    <h3>💬 사용자 리뷰</h3>
+
+    <!-- 리뷰 목록 -->
+    <ul v-if="drug.comments.length">
+      <li v-for="c in drug.comments" :key="c.id" class="review-item">
+        <div class="review-header">
+
+          <strong>{{ c.author.username }}</strong>
+          <span v-if="c.rating" class="review-rating">
+            <span v-for="i in 5" :key="i" :class="{ active: i <= c.rating }">★</span>
+          </span>
+        </div>
+        <p>{{ c.content }}</p>
+      </li>
+    </ul>
+
+    <p v-else class="empty-review">아직 리뷰가 없습니다.</p>
+
+    <!-- 리뷰 작성 -->
+    <div v-if="auth.isLogin" class="review-form">
+
+      <!-- ⭐ 별점 입력 -->
+      <div class="star-rating">
+        <span v-for="i in 5" :key="i" class="star" :class="{ active: i <= (hoverRating || rating) }"
+          @mouseenter="setHover(i)" @mouseleave="clearHover" @click="setRating(i)">
+          ★
+        </span>
+      </div>
+
+      <textarea v-model="newComment" placeholder="이 약에 대한 경험을 남겨주세요"></textarea>
+
+      <button @click="createComment">리뷰 등록</button>
+    </div>
+
+    <p v-else class="login-hint">
+      리뷰를 작성하려면 로그인하세요.
+    </p>
+  </div>
+
 </template>
 
 <script setup>
+import placeholder from '@/assets/drug-placeholder.png'
 import { ref, onMounted } from 'vue'
 import api from '@/api'
+import DrugReactionButtons from '@/components/DrugReactionButtons.vue'
 import { useRoute, useRouter } from 'vue-router'
+
+const onImgError = (e) => {
+  e.target.src = placeholder
+}
 
 const route = useRoute()
 const router = useRouter()
-const drug = ref(null)
+const drug = ref({
+  name: '',
+  effect: '',
+  usage: '',
+  warning: '',
+  image_url: '',
+  avg_rating: null,
+  comments: []
+})
+
 const loading = ref(true)
 const error = ref(false)
 
@@ -144,7 +170,19 @@ async function createComment() {
 
 
 
-const goHome = () => router.push('/')
+const goHome = () => {
+  const keyword = route.query.keyword
+
+  if (keyword) {
+    router.push({
+      path: '/',
+      query: { keyword }
+    })
+  } else {
+    router.push('/')
+  }
+}
+
 </script>
 
 <style scoped>
@@ -258,7 +296,7 @@ const goHome = () => router.push('/')
   background: white;
   padding: 25px;
   border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
 }
 
 .review-item {
@@ -275,6 +313,7 @@ const goHome = () => router.push('/')
 .review-rating span {
   color: #e5e7eb;
 }
+
 .review-rating span.active {
   color: #facc15;
 }
@@ -290,6 +329,7 @@ const goHome = () => router.push('/')
   color: #e5e7eb;
   cursor: pointer;
 }
+
 .star.active {
   color: #facc15;
 }
@@ -316,4 +356,19 @@ const goHome = () => router.push('/')
   margin-top: 15px;
 }
 
+.image-wrap {
+  width: 100%;
+  height: 260px;
+  overflow: hidden;
+  /* 넘치는 부분 자르기 */
+  background: #f8fafc;
+}
+
+.image-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 좌우 꽉 채움 (핵심) */
+  display: block;
+}
 </style>

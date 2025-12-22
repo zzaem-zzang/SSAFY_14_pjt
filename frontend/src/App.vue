@@ -36,6 +36,12 @@ const handleLogout = () => {
   auth.logout()
   router.push({ name: 'Login' })
 }
+
+const clearSearch = () => {
+  router.push({
+    path: '/',      // query 없이 이동
+  })
+}
 </script>
 
 <style>

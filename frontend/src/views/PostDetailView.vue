@@ -6,7 +6,7 @@
         <div class="post-header">
           <h1 class="title">{{ post.title }}</h1>
           <div class="meta">
-            <span class="author">✍️ {{ post.author.username }}</span>
+            <span class="author">작성자 : {{ post.author.username }}</span>
             <span v-if="post.avg_rating" class="rating">
               ⭐ {{ post.avg_rating.toFixed(1) }} / 5
             </span>
