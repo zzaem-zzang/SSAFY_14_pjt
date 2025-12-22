@@ -405,6 +405,7 @@ def drug_ai_summary(request, pk):
         pass
 
     # 2️⃣ GPT 호출
+
     try:
         parsed = call_gpt_for_drug_summary(drug)
     except Exception as e:
@@ -444,40 +445,51 @@ def drug_ai_summary(request, pk):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def drug_ai_image(request, pk):
+    """
+    POST /drugs/<pk>/ai-image/
+    - Gemini 2.0 Flash Exp Image Generation으로 의학 인포그래픽 생성
+    """
     drug = get_object_or_404(Drug, pk=pk)
+    one_liner = ""
+    cautions = []
     
-    # 1️⃣ 요약이 없는 약은 이미지 생성 불가 (선택)
+    # 1️⃣ AI 요약 로드 (없으면 기본값 사용)
     try:
         summary = drug.ai_summary
+        one_liner = summary.one_liner
+        cautions = summary.cautions
+        logger.info(f"AI 요약 사용 - Drug: {drug.name}")
     except DrugAiSummary.DoesNotExist:
-        return Response(
-            {"detail": "AI 요약이 먼저 생성되어야 합니다."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        one_liner = drug.effect[:100] if drug.effect else "증상 완화"
+        cautions = []
+        logger.info(f"AI 요약 없음, 기본값 사용 - Drug: {drug.name}")
 
-    # 2️⃣ image_prompt를 DB에서 가져오지 말고 여기서 만든다
-    image_prompt = f"""
-image_prompt 작성 규칙:
-- 사람 전신(앞면 기준)이 보이는 **의학 인포그래픽 스타일**
-- 약으로 인해 **증상이 완화되는 부위는 초록색(soft green glow)** 으로 표시
-- **부작용이 생길 수 있는 부위는 빨간색(soft red glow)** 으로 표시
-- 초록/빨강 외 색은 최대한 절제
-- 장기 위치는 실제 인체와 크게 어긋나지 않게
-- 배경은 흰색 또는 매우 연한 회색
-- 공포감·과장된 표현 금지
-- 장기 이름을 표시을 작게 검은 글씨로 표시하기 그리고 한국어로 표시하기
-- 증상이 완화되는 되는 부위에서 멀어질수록 색이 옅어지게 표현
-- 증상이 악화되는 부위에서 멀어질수록 색이 옅어지게 표현
-- flat medical illustration, infographic, clean, high clarity
-- 한국어로 무조건 반드시 작성
+    # 2️⃣ 영어 프롬프트 작성 (이미지 생성 모델은 영어가 더 효과적)
+    image_prompt = f"""Create a medical infographic illustration:
 
-작성 규칙:
-- 모든 문장은 부드럽고 단정하지 않은 톤으로 작성한다.
-- 증상을 완화하는 약과 원인을 치료하는 약을 혼동하지 않도록 설명한다.
-- 사용자가 ‘여기까지는 약, 여기부터는 병원’이라고 구분할 수 있게 써라.
+Medicine: {drug.name}
+Main Effect: {one_liner}
+Details: {drug.effect[:200] if drug.effect else 'General symptom relief'}
+Cautions: {', '.join(cautions[:2]) if cautions else 'Standard precautions'}
+
+Visual Requirements:
+- Full human body (front view, standing position)
+- Soft GREEN GLOW on body areas where symptoms are relieved
+- Soft RED GLOW on areas with potential side effects
+- White or light gray background
+- Flat medical illustration, infographic style
+- Label major organs in Korean (한국어)
+- Clean, professional, high clarity
+- Gradient effect: colors fade as distance increases from affected areas
+- NO scary or exaggerated expressions
+
+Style: flat medical illustration, infographic, clean, professional
 """
 
-        # 3️⃣ Gemini API 호출 (핵심: responseModalities를 ["Text", "Image"]로 지정)
+
+    logger.info(f"=== 이미지 생성 시작: {drug.name} ===")
+    logger.info(f"프롬프트 길이: {len(image_prompt)} chars")
+    
     gemini_payload = {
         "contents": [{
             "parts": [{
@@ -516,8 +528,10 @@ image_prompt 작성 규칙:
                 status=status.HTTP_502_BAD_GATEWAY
             )
 
+
         data = res.json()
         logger.info(f"응답 키: {list(data.keys())}")
+
 
         # 4️⃣ base64 이미지 추출
         if "candidates" not in data:
@@ -561,6 +575,7 @@ image_prompt 작성 규칙:
                 "text_preview": text_content
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+
         )
         
     except requests.exceptions.Timeout:
@@ -576,6 +591,7 @@ image_prompt 작성 규칙:
             {"detail": f"네트워크 오류: {str(e)}"},
             status=status.HTTP_502_BAD_GATEWAY
         )
+
 
     except Exception as e:
         logger.exception(f"예상치 못한 오류 - Drug ID: {pk}")
