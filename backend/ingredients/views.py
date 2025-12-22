@@ -477,43 +477,109 @@ image_prompt 작성 규칙:
 - 사용자가 ‘여기까지는 약, 여기부터는 병원’이라고 구분할 수 있게 써라.
 """
 
-    # 3️⃣ Gemini API 호출
+        # 3️⃣ Gemini API 호출 (핵심: responseModalities를 ["Text", "Image"]로 지정)
     gemini_payload = {
-        "contents": [{"parts": [{"text": image_prompt}]}],
-        "responseModalities": ["Text", "Image"]
+        "contents": [{
+            "parts": [{
+                "text": image_prompt
+            }]
+        }],
+        "generationConfig": {
+            "responseModalities": ["Text", "Image"]  # ⭐ Text와 Image 둘 다 요청
+        }
     }
 
-    res = requests.post(
-        GMS_GEMINI_IMAGE_URL,
-        params={"key": settings.GMS_KEY},
-        json=gemini_payload,
-        timeout=60,
-    )
+    try:
+        res = requests.post(
+            GMS_GEMINI_IMAGE_URL,
+            params={"key": settings.GMS_KEY},
+            json=gemini_payload,
+            timeout=60,
+        )
+        
+        logger.info(f"Gemini 응답 상태: {res.status_code}")
 
-    if res.status_code != 200:
+        if res.status_code != 200:
+            # 에러 응답 상세 로깅
+            try:
+                error_data = res.json()
+                logger.error(f"Gemini 에러 JSON: {error_data}")
+            except:
+                logger.error(f"Gemini 에러 TEXT: {res.text[:500]}")
+            
+            return Response(
+                {
+                    "detail": "이미지 생성 실패",
+                    "status_code": res.status_code,
+                    "error": res.text[:500],
+                },
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        data = res.json()
+        logger.info(f"응답 키: {list(data.keys())}")
+
+        # 4️⃣ base64 이미지 추출
+        if "candidates" not in data:
+            logger.error(f"candidates 없음. 응답: {str(data)[:300]}")
+            return Response(
+                {
+                    "detail": "이미지 생성 실패: 잘못된 응답 형식",
+                    "response": str(data)[:500]
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        parts = data["candidates"][0]["content"]["parts"]
+        logger.info(f"Parts 개수: {len(parts)}")
+        
+        # 각 part를 순회하며 이미지 찾기
+        for i, p in enumerate(parts):
+            logger.info(f"Part {i} 키: {list(p.keys())}")
+            
+            if "inlineData" in p:
+                mime_type = p["inlineData"]["mimeType"]
+                base64_data = p["inlineData"]["data"]
+                logger.info(f"✅ 이미지 생성 성공! MIME: {mime_type}, 크기: {len(base64_data)} chars")
+                
+                return Response({
+                    "mime_type": mime_type,
+                    "base64": base64_data,
+                })
+
+        # 이미지가 없고 텍스트만 있는 경우
+        logger.warning("이미지 없음, 텍스트만 반환됨")
+        text_content = ""
+        for p in parts:
+            if "text" in p:
+                text_content = p["text"][:200]
+                break
+        
         return Response(
             {
-            "detail": "Gemini 이미지 생성 요청이 거부되었습니다.",
-            "status_code": res.status_code,
-            "error": res.text,
+                "detail": "이미지 생성 실패: Gemini가 텍스트만 반환했습니다.",
+                "text_preview": text_content
             },
-            status=status.HTTP_400_BAD_REQUEST
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+    except requests.exceptions.Timeout:
+        logger.error("Gemini API 타임아웃 (60초)")
+        return Response(
+            {"detail": "이미지 생성 시간 초과"},
+            status=status.HTTP_504_GATEWAY_TIMEOUT
         )
 
-    data = res.json()
+    except requests.exceptions.RequestException as e:
+        logger.exception("Gemini API 네트워크 에러")
+        return Response(
+            {"detail": f"네트워크 오류: {str(e)}"},
+            status=status.HTTP_502_BAD_GATEWAY
+        )
 
-
-    # 4️⃣ base64 이미지 추출
-    parts = data["candidates"][0]["content"]["parts"]
-    for p in parts:
-        if "inlineData" in p:
-            return Response({
-                "mime_type": p["inlineData"]["mimeType"],
-                "base64": p["inlineData"]["data"],
-            })
-
-    return Response(
-        {"detail": "이미지 생성 실패"},
-        status=status.HTTP_500_INTERNAL_SERVER_ERROR
-    )
-
+    except Exception as e:
+        logger.exception(f"예상치 못한 오류 - Drug ID: {pk}")
+        return Response(
+            {"detail": "서버 내부 오류", "error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
