@@ -16,15 +16,91 @@
       <div class="image-wrap">
         <img :src="drug.image_url || placeholder" @error="onImgError" alt="약 이미지" />
       </div>
+      
       <!-- ⭐ 평균 별점 -->
       <div v-if="typeof drug.avg_rating === 'number'" class="avg-rating">
-
         ⭐ 평균 평점 {{ drug.avg_rating.toFixed(1) }} / 5
       </div>
 
       <!-- 👍👎 사용자 반응 버튼 -->
       <DrugReactionButtons />
 
+      <!-- 🎫 QR 코드 섹션 -->
+      <section class="qr-section">
+        <div class="qr-header">
+          <h3>📱 약국에서 보여주기</h3>
+          <p class="qr-desc">약국에서 이 QR 코드를 스캔하면 약 정보가 텍스트로 나타나요!</p>
+        </div>
+
+        <button 
+          v-if="!showQR" 
+          @click="generateQR" 
+          class="qr-btn"
+          :disabled="qrLoading"
+        >
+          {{ qrLoading ? 'QR 코드 생성 중...' : '🎫 QR 코드 생성하기' }}
+        </button>
+
+        <div v-if="showQR" class="qr-display">
+          <!-- QR 코드 이미지 -->
+          <div class="qr-image-container">
+            <img :src="qrImage" alt="약 정보 QR 코드" class="qr-image" />
+          </div>
+          
+          <!-- 약 정보 -->
+          <div class="qr-info">
+            <p class="qr-drug-name">{{ drug.name }}</p>
+            <p class="qr-instruction">📸 약국 직원에게 이 화면을 보여주세요</p>
+          </div>
+
+          <!-- 🔥 스캔하면 보이는 정보 미리보기 -->
+          <div class="qr-preview" v-if="drugInfo && Object.keys(drugInfo).length > 0">
+            <h4>📋 QR 스캔 시 표시되는 정보:</h4>
+            <div class="preview-content">
+              <div class="preview-item">
+                <span class="preview-label">약품명:</span>
+                <span class="preview-value">{{ drugInfo['약품명'] }}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">효능효과:</span>
+                <span class="preview-value">{{ drugInfo['효능효과'] }}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">용법용량:</span>
+                <span class="preview-value">{{ drugInfo['용법용량'] }}</span>
+              </div>
+              <div class="preview-item warning-item">
+                <span class="preview-label">⚠️ 주의사항:</span>
+                <span class="preview-value">{{ drugInfo['주의사항'] }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 버튼들 -->
+          <div class="qr-actions">
+            <button @click="downloadQR" class="download-btn">
+              💾 QR 코드 저장
+            </button>
+            <button @click="printQR" class="print-btn">
+              🖨️ 인쇄하기
+            </button>
+            <button @click="shareQR" class="share-btn">
+              📤 공유하기
+            </button>
+          </div>
+
+          <!-- 사용 팁 -->
+          <div class="usage-tip">
+            <p>💡 <strong>약국에서 사용법:</strong></p>
+            <ol>
+              <li>약국 직원에게 QR 코드를 보여주세요</li>
+              <li>직원이 스캔하면 약 정보가 <strong>텍스트</strong>로 나타납니다</li>
+              <li>약사님이 정보를 확인하고 약을 찾아드립니다</li>
+            </ol>
+            <p class="tip-note">💡 네트워크 연결 없이도 작동합니다!</p>
+          </div>
+        </div>
+      </section>
 
       <div class="card-body">
         <section class="info-section">
@@ -42,6 +118,7 @@
           <p>{{ drug.warning || '정보 없음' }}</p>
         </section>
       </div>
+
       <!-- 🤖 AI 요약 섹션 -->
       <section class="ai-card">
         <h3>🤖 AI 요약</h3>
@@ -50,7 +127,6 @@
 
         <div v-else-if="aiSummary">
           <p class="one-liner">{{ aiSummary.one_liner }}</p>
-
           <p class="easy">{{ aiSummary.easy_explain }}</p>
 
           <ul>
@@ -68,6 +144,7 @@
           </ul>
         </div>
       </section>
+
       <!-- 🖼️ AI 이미지 -->
       <section class="ai-image">
         <button @click="generateAiImage" :disabled="imageLoading">
@@ -87,16 +164,17 @@
     </div>
   </div>
 
-
   <!-- 💬 리뷰 섹션 -->
   <div class="review-card">
     <h3>💬 사용자 리뷰</h3>
 
     <!-- 리뷰 목록 -->
+
     <ul v-if="drug.comments.length">
       <li v-for="c in drug.comments" :key="`comment-${c.id}`" class="review-item">
         <div class="review-header">
           <span>{{ c.author.nickname || c.author.username }}</span>
+
           <span v-if="c.rating" class="review-rating">
             <span v-for="i in 5" :key="i" :class="{ active: i <= c.rating }">★</span>
           </span>
@@ -109,7 +187,6 @@
 
     <!-- 리뷰 작성 -->
     <div v-if="auth.isLogin" class="review-form">
-
       <!-- ⭐ 별점 입력 -->
       <div class="star-rating">
         <span v-for="i in 5" :key="i" class="star" :class="{ active: i <= (hoverRating || rating) }"
@@ -119,7 +196,6 @@
       </div>
 
       <textarea v-model="newComment" placeholder="이 약에 대한 경험을 남겨주세요"></textarea>
-
       <button @click="createComment">리뷰 등록</button>
     </div>
 
@@ -127,7 +203,6 @@
       리뷰를 작성하려면 로그인하세요.
     </p>
   </div>
-
 </template>
 
 <script setup>
@@ -136,9 +211,105 @@ import { ref, onMounted } from 'vue'
 import api from '@/api'
 import DrugReactionButtons from '@/components/DrugReactionButtons.vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 
 const onImgError = (e) => {
   e.target.src = placeholder
+}
+
+// 🎫 QR 코드 관련 변수
+const showQR = ref(false)
+const qrImage = ref('')
+const drugInfo = ref({})  // 🔥 약 정보 저장
+const qrLoading = ref(false)
+
+// QR 코드 생성
+const generateQR = async () => {
+  qrLoading.value = true
+  try {
+    const res = await api.get(`/drugs/${route.params.id}/qr/`)
+    qrImage.value = res.data.qr_image
+    drugInfo.value = res.data.drug_info  // 🔥 약 정보 저장
+    showQR.value = true
+    console.log('✅ QR 코드 생성 완료')
+    console.log('✅ 약 정보:', drugInfo.value)
+  } catch (e) {
+    console.error('❌ QR 코드 생성 에러:', e)
+    alert(`QR 코드 생성에 실패했습니다: ${e.response?.data?.error || e.message}`)
+  } finally {
+    qrLoading.value = false
+  }
+}
+
+// QR 코드 다운로드
+const downloadQR = () => {
+  const link = document.createElement('a')
+  link.href = qrImage.value
+  link.download = `${drug.value.name}_QR코드.png`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+// QR 코드 인쇄
+const printQR = () => {
+  const printWindow = window.open('', '', 'height=600,width=800')
+  printWindow.document.write('<html><head><title>약 정보 QR 코드</title>')
+  printWindow.document.write('<style>')
+  printWindow.document.write(`
+    body { 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      justify-content: center; 
+      padding: 20px; 
+      font-family: sans-serif;
+    }
+    h1 { margin: 20px 0; font-size: 28px; }
+    img { max-width: 400px; border: 2px solid #000; padding: 10px; }
+    p { margin: 10px 0; font-size: 14px; color: #666; }
+    .instruction { font-weight: bold; margin-top: 20px; }
+  `)
+  printWindow.document.write('</style></head><body>')
+  printWindow.document.write(`<h1>${drug.value.name}</h1>`)
+  printWindow.document.write(`<img src="${qrImage.value}" />`)
+  printWindow.document.write('<p class="instruction">약국에서 이 QR 코드를 스캔하면<br>약 정보가 텍스트로 나타납니다</p>')
+  printWindow.document.write('</body></html>')
+  printWindow.document.close()
+  setTimeout(() => {
+    printWindow.print()
+  }, 250)
+}
+
+// QR 코드 공유
+const shareQR = async () => {
+  try {
+    const response = await fetch(qrImage.value)
+    const blob = await response.blob()
+    const file = new File([blob], `${drug.value.name}_QR.png`, { type: 'image/png' })
+
+    if (navigator.share && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: `${drug.value.name} - 약 정보`,
+        text: `약국에서 보여줄 ${drug.value.name} QR 코드입니다.`,
+        files: [file]
+      })
+      console.log('✅ 공유 완료')
+    } else {
+      console.log('공유 API 미지원, 다운로드로 대체')
+      downloadQR()
+      alert('이 브라우저는 공유 기능을 지원하지 않아 다운로드했습니다.')
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      console.error('공유 실패:', e)
+      alert('공유에 실패했습니다. 다운로드를 시도해주세요.')
+    }
+  }
 }
 
 // 🤖 AI 요약
@@ -179,10 +350,6 @@ const generateAiImage = async () => {
   }
 }
 
-
-
-const route = useRoute()
-const router = useRouter()
 const drug = ref({
   name: '',
   effect: '',
@@ -207,10 +374,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-import { useAuthStore } from '@/stores/auth'
-
-const auth = useAuthStore()
 
 const newComment = ref('')
 const rating = ref(0)
@@ -246,8 +409,6 @@ async function createComment() {
   }
 }
 
-
-
 const goHome = () => {
   const keyword = route.query.keyword
 
@@ -260,7 +421,6 @@ const goHome = () => {
     router.push('/')
   }
 }
-
 </script>
 
 <style scoped>
@@ -416,6 +576,10 @@ const goHome = () => {
   width: 100%;
   min-height: 80px;
   margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-family: inherit;
 }
 
 .review-form button {
@@ -425,6 +589,10 @@ const goHome = () => {
   border-radius: 8px;
   border: none;
   cursor: pointer;
+}
+
+.review-form button:hover {
+  background: #4338ca;
 }
 
 .empty-review,
@@ -438,7 +606,6 @@ const goHome = () => {
   width: 100%;
   height: 260px;
   overflow: hidden;
-  /* 넘치는 부분 자르기 */
   background: #f8fafc;
 }
 
@@ -446,12 +613,11 @@ const goHome = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* 좌우 꽉 채움 (핵심) */
   display: block;
 }
 
 .ai-card {
-  margin-top: 30px;
+  margin: 30px;
   padding: 20px;
   border-radius: 16px;
   background: #f8fafc;
@@ -468,14 +634,26 @@ const goHome = () => {
   color: #475569;
 }
 
+.ai-image {
+  margin: 30px;
+}
+
 .ai-image button {
-  margin-top: 16px;
   padding: 10px 20px;
   border-radius: 10px;
   background: #4f46e5;
   color: white;
   border: none;
   cursor: pointer;
+}
+
+.ai-image button:hover {
+  background: #4338ca;
+}
+
+.ai-image button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
 }
 
 .ai-image img {
@@ -487,4 +665,254 @@ const goHome = () => {
   border-radius: 12px;
 }
 
+/* 🎫 QR 코드 스타일 */
+.qr-section {
+  margin: 30px;
+  padding: 25px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 16px;
+  border: 2px dashed #0ea5e9;
+}
+
+.qr-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.qr-header h3 {
+  color: #0369a1;
+  font-size: 1.3rem;
+  margin-bottom: 8px;
+}
+
+.qr-desc {
+  color: #0c4a6e;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.qr-btn {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  background: #0ea5e9;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.qr-btn:hover:not(:disabled) {
+  background: #0284c7;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.qr-btn:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.qr-display {
+  text-align: center;
+}
+
+.qr-image-container {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  display: inline-block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.qr-image {
+  width: 280px;
+  height: 280px;
+  display: block;
+}
+
+.qr-info {
+  margin-bottom: 20px;
+}
+
+.qr-drug-name {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0369a1;
+  margin: 0 0 8px 0;
+}
+
+.qr-instruction {
+  color: #0c4a6e;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* 🔥 QR 미리보기 스타일 */
+.qr-preview {
+  background: white;
+  border: 2px solid #e0f2fe;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.qr-preview h4 {
+  color: #0369a1;
+  font-size: 1rem;
+  margin: 0 0 15px 0;
+  text-align: center;
+}
+
+.preview-content {
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.preview-item {
+  margin: 12px 0;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #0ea5e9;
+}
+
+.preview-item.warning-item {
+  background: #fef2f2;
+  border-left-color: #ef4444;
+}
+
+.preview-label {
+  display: block;
+  font-weight: 700;
+  color: #0369a1;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+}
+
+.preview-item.warning-item .preview-label {
+  color: #dc2626;
+}
+
+.preview-value {
+  display: block;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.preview-item.warning-item .preview-value {
+  color: #991b1b;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+
+.qr-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.download-btn {
+  background: #10b981;
+  color: white;
+}
+
+.download-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.print-btn {
+  background: #6366f1;
+  color: white;
+}
+
+.print-btn:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.share-btn {
+  background: #f59e0b;
+  color: white;
+}
+
+.share-btn:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+
+/* 사용 팁 */
+.usage-tip {
+  background: #fef3c7;
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
+  padding: 15px;
+  margin-top: 20px;
+  text-align: left;
+}
+
+.usage-tip p {
+  margin: 0 0 10px 0;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.usage-tip ol {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+  color: #78350f;
+}
+
+.usage-tip li {
+  margin: 5px 0;
+  line-height: 1.5;
+}
+
+.tip-note {
+  margin: 10px 0 0 0 !important;
+  font-size: 0.9rem;
+  color: #059669 !important;
+  font-weight: 600 !important;
+}
+
+/* 모바일 반응형 */
+@media (max-width: 640px) {
+  .qr-image {
+    width: 220px;
+    height: 220px;
+  }
+  
+  .qr-actions {
+    flex-direction: column;
+  }
+  
+  .qr-actions button {
+    width: 100%;
+  }
+  
+  .preview-content {
+    font-size: 0.85rem;
+  }
+}
 </style>

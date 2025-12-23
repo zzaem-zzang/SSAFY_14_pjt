@@ -1,16 +1,33 @@
 <template>
-  <div class="home-wrapper">
-    <div class="hero-section">
-      <h1 class="main-title">어떤 약을 찾고 계신가요?</h1>
-      <p class="sub-title">증상을 검색하거나 의약품 이름을 입력해보세요.</p>
+  <div class="container">
+    <div class="home-wrapper">
+      <div class="hero-section">
+        <h1 class="main-title">어떤 약을 찾고 계신가요?</h1>
+        <p class="sub-title">증상을 검색하거나 의약품 이름을 입력해보세요.</p>
+      </div>
+
+      <DrugSearch />
+      <hr class="divider" />
+      <SymptomRecommend />
     </div>
 
+
     <DrugSearch />
+
+    <section style="max-width: 800px; margin: 24px auto; padding: 0 20px;">
+      <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">
+        내 주변 약국 지도
+      </h3>
+      <MapView />
+    </section>
   </div>
 </template>
 
 <script setup>
 import DrugSearch from '@/components/DrugSearch.vue'
+import SymptomRecommend from '@/components/SymptomRecommend.vue'
+import MapView from '@/components/MapView.vue'  // 경로 확인!
+
 </script>
 <style scoped>
 .home-wrapper {
