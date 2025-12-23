@@ -19,8 +19,8 @@ const router = createRouter({
     { path: '/drugs/:id', component: DrugDetailView },
     { path: '/login', name: 'Login', component: LoginView },
     { path: '/signup', name: 'SignUp', component: SignUpView },
-    { path: '/mypage',name: 'MyPage', component: () => import('@/views/MyPage.vue'),meta: { requiresAuth: true },}
-
+    { path: '/mypage',name: 'MyPage', component: () => import('@/views/MyPage.vue'),meta: { requiresAuth: true }},
+    {path: '/pharmacy-map', name: 'PharmacyMap', component: () => import('@/views/PharmacyMapView.vue')}
   ],
 })
 
