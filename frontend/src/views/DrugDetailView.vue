@@ -169,10 +169,12 @@
     <h3>💬 사용자 리뷰</h3>
 
     <!-- 리뷰 목록 -->
-    <ul v-if="drug.comments && drug.comments.length">
-      <li v-for="c in drug.comments" :key="c.id" class="review-item">
+
+    <ul v-if="drug.comments.length">
+      <li v-for="c in drug.comments" :key="`comment-${c.id}`" class="review-item">
         <div class="review-header">
-          <strong>{{ c.author.username }}</strong>
+          <span>{{ c.author.nickname || c.author.username }}</span>
+
           <span v-if="c.rating" class="review-rating">
             <span v-for="i in 5" :key="i" :class="{ active: i <= c.rating }">★</span>
           </span>

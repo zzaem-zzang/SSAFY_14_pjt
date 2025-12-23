@@ -1,7 +1,20 @@
 <template>
   <section class="search-section">
+    <!-- 🔍 검색 타입 선택 -->
+    <div class="search-type">
+      <label>
+        <input type="radio" value="drug" v-model="searchType" />
+        약 이름
+      </label>
+      <label>
+        <input type="radio" value="symptom" v-model="searchType" />
+        증상
+      </label>
+    </div>
     <div class="search-bar">
-      <input v-model="keyword" placeholder="약 이름(예: 타이레놀)을 입력하세요" @keyup.enter="search" />
+      <input v-model="keyword" :placeholder="searchType === 'drug'
+        ? '약 이름 (예: 타이레놀)'
+        : '어디가 아픈지 자연스럽게 입력해보세요 (예: 머리가 너무 아파요)'" @keyup.enter="search" />
       <button @click="search" class="btn-search">검색</button>
     </div>
 
@@ -63,7 +76,7 @@ const drugs = ref([])
 const loading = ref(false)
 const searched = ref(false)
 const errorMessage = ref('')
-
+const searchType = ref('drug') // 'drug' | 'symptom'
 const route = useRoute()
 
 onMounted(() => {
@@ -85,24 +98,47 @@ const setOrder = (value) => {
 
 const search = async () => {
   if (!keyword.value.trim()) return
+
   loading.value = true
   searched.value = true
   errorMessage.value = ''
 
   try {
-    const res = await api.get('/drugs/save/', {
-      params: {
-        name: keyword.value,
-        order: order.value !== 'default' ? order.value : undefined
-      }
-    })
-    drugs.value = res.data.saved || []
+    let res
+
+    // 🔹 약 이름 검색
+    if (searchType.value === 'drug') {
+      res = await api.get('/drugs/', {
+        params: {
+          search: keyword.value,
+          order: order.value !== 'default' ? order.value : undefined
+        }
+      })
+      drugs.value = res.data || []
+    }
+
+    // 🔹 🧠 자연어 증상 검색
+    if (searchType.value === 'symptom') {
+      res = await api.get('/drugs/ai-search/', {
+        params: {
+          q: keyword.value
+        }
+      })
+      drugs.value = res.data.results || []
+    }
+
   } catch (err) {
-    errorMessage.value = err.response?.data?.detail || '검색 중 오류가 발생했습니다.'
+    errorMessage.value =
+      err.response?.data?.message ||
+      err.response?.data?.detail ||
+      '검색 중 오류가 발생했습니다.'
   } finally {
     loading.value = false
   }
 }
+
+
+
 
 const goDetail = (id) => {
   router.push({
@@ -265,5 +301,4 @@ input {
   background: #4f46e5;
   color: white;
 }
-
 </style>

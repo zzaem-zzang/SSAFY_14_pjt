@@ -6,7 +6,8 @@
         <div class="post-header">
           <h1 class="title">{{ post.title }}</h1>
           <div class="meta">
-            <span class="author">작성자 : {{ post.author.username }}</span>
+            <strong class="author">작성자 : {{ post.author.nickname }}</strong>
+
             <span v-if="post.avg_rating" class="rating">
               ⭐ {{ post.avg_rating.toFixed(1) }} / 5
             </span>
@@ -30,7 +31,7 @@
 
         <ul class="comment-list">
           <li v-for="c in post.comments" :key="c.id" class="comment-item">
-            <div class="comment-author">{{ c.author.username }}</div>
+            <div class="comment-author">{{ c.author.nickname }}</div>
             <div class="comment-text">{{ c.content }}</div>
           </li>
           <li v-if="post.comments.length === 0" class="empty-comment">

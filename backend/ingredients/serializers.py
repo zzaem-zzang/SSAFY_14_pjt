@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Drug, Symptom, DrugComment, DrugReaction
+from .models import Drug, DrugComment, DrugReaction
 from accounts.serializers import UserSerializer
 from django.db.models import Avg, Count
 
@@ -8,7 +8,13 @@ class DrugCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DrugComment
-        fields = ('id', 'content', 'rating', 'author', 'created_at')
+        fields = (
+            'id',
+            'content',
+            'rating',
+            'author',      # ← author 안에 nickname 포함됨
+            'created_at',
+        )
 
 
 class DrugSerializer(serializers.ModelSerializer):
@@ -35,10 +41,7 @@ class DrugSerializer(serializers.ModelSerializer):
         )
 
 
-class SymptomSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Symptom
-        fields = ['id', 'name']
+
 
 
 class DrugDetailSerializer(serializers.ModelSerializer):

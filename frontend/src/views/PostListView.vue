@@ -14,7 +14,7 @@
         <div class="post-content">
           <h3 class="post-title">{{ p.title }}</h3>
           <span class="post-meta">
-            작성자: <b>{{ p.author.username }}</b> </span>
+            작성자: <b>{{ p.author.nickname }}</b> </span>
         </div>
         <div class="post-arrow">›</div>
       </div>

@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-
+from django.db.models import Count
 # ========================
 # Django 기본
 # ========================
@@ -19,6 +19,8 @@ from django.db.models import Avg, Count, Q, F, FloatField, ExpressionWrapper
 import json
 import requests
 import logging
+from .utils import search_drugs_by_ai
+
 
 # ========================
 # 로컬 앱
@@ -26,13 +28,10 @@ import logging
 from .models import (
     Drug,
     DrugAiSummary,   
-    Symptom,
     DrugReaction,
 )
-from .utils import fetch_drug_from_api
 from .serializers import (
     DrugSerializer,
-    SymptomSerializer,
     DrugCommentSerializer,
     DrugReactionSerializer,
     DrugDetailSerializer,
@@ -122,99 +121,7 @@ def create_drug_comment(request, pk):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-# ================================
-# 🔍 약 이름으로 검색 + DB 저장
-# ================================
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def save_drug_by_name(request):
-    """
-    GET /drugs/save/?name=타이레놀
-    - 외부 공공 API 호출
-    - DB에 없으면 저장
-    - 검색 결과 리스트 반환
-    """
-    name = request.query_params.get('name')
 
-    if not name:
-        return Response(
-            {'error': 'name 파라미터가 필요합니다.'},
-            status=400
-        )
-
-    # 1️⃣ 외부 API 호출
-    try:
-        data = fetch_drug_from_api(name)
-    except Exception as e:
-        logger.exception('외부 API 호출 중 예외 발생')
-        err = str(e)
-
-        # 인증 관련 에러 구분
-        if '401' in err or 'Unauthorized' in err or '인증' in err:
-            return Response(
-                {'error': '외부 API 인증 실패: E_DRUG_API_KEY를 확인하세요.'},
-                status=502
-            )
-
-        return Response(
-            {'error': f'외부 API 호출 실패: {err}'},
-            status=502
-        )
-
-    body = data.get('body', {})
-    items = body.get('items', [])
-
-    # API 응답이 dict 형태일 경우 보정
-    if isinstance(items, dict):
-        items = items.get('item', [])
-
-    # 검색 결과가 없는 경우도 정상 응답
-    if not items:
-        return Response(
-            {'message': '검색 결과가 없습니다.', 'saved_count': 0},
-            status=200
-        )
-
-    saved = []
-    failed = []
-
-    # 2️⃣ 하나라도 성공하면 전체 성공 처리
-    for item in items:
-        try:
-            item_name = item.get('itemName')
-            if not item_name:
-                continue
-
-            # 동일 이름의 약이 있으면 재사용
-            drug, created = Drug.objects.get_or_create(
-                name=item_name,
-                defaults={
-                    'effect': item.get('efcyQesitm', ''),
-                    'usage': item.get('useMethodQesitm', ''),
-                    'warning': item.get('atpnWarnQesitm', ''),
-                    'image_url': item.get('itemImage', ''),
-                }
-            )
-
-            saved.append({
-                'id': drug.id,
-                'name': drug.name,
-                'created': created,
-                'image_url': drug.image_url,
-            })
-
-        except Exception as e:
-            # 개별 실패는 전체 실패로 보지 않음
-            failed.append(str(e))
-
-    return Response(
-        {
-            'saved_count': len(saved),
-            'saved': saved,
-            'failed_count': len(failed),
-        },
-        status=200
-    )
 
 
 # ================================
@@ -230,46 +137,6 @@ def drug_detail(request, pk):
     """
     drug = get_object_or_404(Drug, pk=pk)
     serializer = DrugDetailSerializer(drug)
-    return Response(serializer.data)
-
-
-# ================================
-# 🤕 증상 기반 약 추천
-# ================================
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def recommend_by_symptom(request):
-    """
-    GET /drugs/recommend/?symptom=1
-    - 특정 증상에 연결된 약 목록 반환
-    """
-    symptom_id = request.query_params.get('symptom')
-
-    if not symptom_id:
-        return Response({'error': 'symptom 파라미터 필요'}, status=400)
-
-    symptom = get_object_or_404(Symptom, pk=symptom_id)
-    drugs = symptom.drugs.all()
-
-    serializer = DrugSerializer(drugs, many=True)
-    return Response({
-        'symptom': symptom.name,
-        'recommendations': serializer.data
-    })
-
-
-# ================================
-# 📋 증상 목록 조회
-# ================================
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def symptom_list(request):
-    """
-    GET /symptoms/
-    - 전체 증상 목록 반환
-    """
-    symptoms = Symptom.objects.all()
-    serializer = SymptomSerializer(symptoms, many=True)
     return Response(serializer.data)
 
 
@@ -351,16 +218,17 @@ def drug_reaction(request, drug_id):
 
 
 # ================================
-# 📊 약 목록 + 정렬
+# 📊 약 목록 + 검색 + 정렬
 # ================================
 @api_view(['GET'])
 def drug_list(request):
     """
-    GET /drugs/?order=helpful|rating
+    GET /drugs/?search=타이레놀&order=helpful|rating
+    - 약 이름 검색
     - 기본순 / 도움순 / 평점순 정렬
-    - 도움됐어요 비율 계산
     """
     order = request.query_params.get('order')
+    search = request.query_params.get('search')  # ⭐ 핵심 추가
 
     drugs = Drug.objects.annotate(
         avg_rating=Avg('comments__rating'),
@@ -373,13 +241,16 @@ def drug_list(request):
             filter=Q(reactions__reaction='unhelpful')
         ),
     ).annotate(
-        # 도움됐어요 비율 (%)
         helpful_ratio=ExpressionWrapper(
             100.0 * F('helpful_count') /
             (F('helpful_count') + F('unhelpful_count')),
             output_field=FloatField()
         )
     )
+
+    # ⭐⭐⭐ 약 이름 필터링 핵심 ⭐⭐⭐
+    if search:
+        drugs = drugs.filter(name__icontains=search)
 
     if order == 'helpful':
         drugs = drugs.order_by('-helpful_ratio')
@@ -390,6 +261,7 @@ def drug_list(request):
 
     serializer = DrugSerializer(drugs, many=True)
     return Response(serializer.data)
+
 
 # 텍스트
 @api_view(["GET"])
@@ -609,6 +481,35 @@ Style: flat medical illustration, infographic, clean, professional
         )
         
         
+
+
+
+
+@api_view(['GET'])
+def drug_ai_search(request):
+    """
+    GET /api/drugs/ai-search/?q=머리가 지끈거리고 열나요
+    """
+    q = request.GET.get('q', '').strip()
+
+    if not q:
+        return Response(
+            {'message': '검색어를 입력해주세요.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    drugs, symptoms = search_drugs_by_ai(q)
+
+    serializer = DrugSerializer(drugs, many=True)
+    return Response({
+        "input": q,
+        "detected_symptoms": symptoms,
+        "count": drugs.count(),
+        "results": serializer.data
+    })
+
+
+
 
 @api_view(['GET'])
 def generate_drug_qr(request, drug_id):

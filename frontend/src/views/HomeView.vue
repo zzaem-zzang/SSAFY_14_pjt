@@ -11,6 +11,9 @@
       <SymptomRecommend />
     </div>
 
+
+    <DrugSearch />
+
     <section style="max-width: 800px; margin: 24px auto; padding: 0 20px;">
       <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">
         내 주변 약국 지도
@@ -24,8 +27,8 @@
 import DrugSearch from '@/components/DrugSearch.vue'
 import SymptomRecommend from '@/components/SymptomRecommend.vue'
 import MapView from '@/components/MapView.vue'  // 경로 확인!
-</script>
 
+</script>
 <style scoped>
 .home-wrapper {
   max-width: 800px;

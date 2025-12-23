@@ -1,14 +1,7 @@
 from rest_framework import serializers
 from .models import Post, Comment
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
-
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ('id', 'username')
+from accounts.serializers import UserSerializer
+from django.db.models import Avg
 
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -39,8 +32,6 @@ class PostListSerializer(serializers.ModelSerializer):
         return obj.content[:200]
 
 
-from django.db.models import Avg
-
 class PostDetailSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
@@ -55,14 +46,6 @@ class PostDetailSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'content',
-            'author',
-            'comments',
-            'avg_rating',
-            'created_at',
-            'updated_at',
-        )
-        read_only_fields = (
-            'id',
             'author',
             'comments',
             'avg_rating',
