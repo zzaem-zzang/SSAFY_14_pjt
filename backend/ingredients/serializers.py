@@ -29,6 +29,7 @@ class DrugSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'name',
+            'image',
             'image_url',
             'avg_rating',
             'helpful_count',
@@ -59,9 +60,10 @@ class DrugDetailSerializer(serializers.ModelSerializer):
             'effect',
             'usage',
             'warning',
-            'image_url',   # ⭐ 이것도 꼭 있어야 함
+            'image_url',   
             'avg_rating',
             'comments',
+            'view_count',
         )
 
 

@@ -47,14 +47,10 @@ def fetch_all_drugs_from_api():
 # db 캐싱 함수
 
 
-
-
 def cache_drugs_on_startup():
-    # ⭐ 테이블이 아직 없으면 아무 것도 하지 않음
     if 'ingredients_drug' not in connection.introspection.table_names():
         return
 
-    # ⭐ 이미 데이터가 있으면 재캐싱 안 함
     if Drug.objects.exists():
         print("✅ Drug cache already exists")
         return
@@ -64,15 +60,22 @@ def cache_drugs_on_startup():
     drugs = fetch_all_drugs_from_api()
 
     for d in drugs:
-        Drug.objects.create(
+        drug = Drug.objects.create(
             name=d.get("itemName", ""),
             effect=d.get("efcyQesitm", ""),
             usage=d.get("useMethodQesitm", ""),
             warning=d.get("atpnWarnQesitm", ""),
-            image_url=d.get("itemImage")
+            image_url=d.get("itemImage"),
         )
 
+        # 🔥 이미지 미리 저장
+        if drug.image_url:
+            download_and_save_image(drug, drug.image_url)
+
     print(f"✅ Drug cache completed ({len(drugs)} items)")
+
+
+
 
 
 ## 키워드 추출
@@ -143,3 +146,27 @@ def search_drugs_by_ai(text):
     keywords = extract_keywords_with_ai(text)
     drugs = search_drugs_by_effect_keywords(keywords)
     return drugs, keywords
+
+
+
+import requests
+from django.core.files.base import ContentFile
+
+def download_and_save_image(drug, image_url):
+    """
+    외부 이미지 URL → 우리 서버에 저장
+    """
+    try:
+        res = requests.get(image_url, timeout=10)
+        if res.status_code != 200:
+            return
+
+        filename = image_url.split('/')[-1] + '.jpg'
+        drug.image.save(
+            filename,
+            ContentFile(res.content),
+            save=True
+        )
+
+    except Exception as e:
+        print(f"❌ 이미지 저장 실패: {drug.name}", e)

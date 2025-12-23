@@ -125,7 +125,7 @@ def create_drug_comment(request, pk):
 
 
 # ================================
-# 📄 약 상세 조회
+# 📄 약 상세 조회 (조회수 포함)
 # ================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -133,12 +133,31 @@ def drug_detail(request, pk):
     """
     GET /drugs/<pk>/
     - 약 상세 정보
-    - 효능 / 용법 / 주의사항 / 평균 평점 / 댓글 포함
+    - 조회수 증가
     """
     drug = get_object_or_404(Drug, pk=pk)
+
+    # ⭐ 조회수 증가
+    Drug.objects.filter(pk=pk).update(
+        view_count=F('view_count') + 1
+    )
+
+    # 최신 값 다시 가져오기
+    drug.refresh_from_db()
+
     serializer = DrugDetailSerializer(drug)
     return Response(serializer.data)
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def popular_drugs_by_view(request):
+    """
+    GET /api/drugs/popular/views/
+    - 조회수 기준 인기 약 TOP 10
+    """
+    drugs = Drug.objects.order_by('-view_count')[:10]
+    serializer = DrugSerializer(drugs, many=True)
+    return Response(serializer.data)
 
 # ================================
 # 👍👎 사용자 반응 (도움됐어요)

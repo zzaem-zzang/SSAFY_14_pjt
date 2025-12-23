@@ -45,7 +45,7 @@
       <div class="drug-card" v-for="drug in drugs" :key="drug.id" @click="goDetail(drug.id)">
         <!-- ⭐ 낱알 이미지 -->
         <div class="image-wrap">
-          <img :src="drug.image_url || placeholder" @error="onImgError" alt="약 이미지" />
+          <img :src="drug.image || drug.image_url || placeholder" @error="onImgError" />
         </div>
         <div class="card-header">
           <h3>{{ drug.name }}</h3>
