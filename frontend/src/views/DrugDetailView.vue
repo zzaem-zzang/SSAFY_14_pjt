@@ -14,9 +14,9 @@
       </div>
 
       <div class="image-wrap">
-        <img :src="drug.image_url || placeholder" @error="onImgError" alt="약 이미지" />
+        <img :src="drug.image || drug.image_url || placeholder" @error="onImgError" alt="약 이미지" />
       </div>
-      
+
       <!-- ⭐ 평균 별점 -->
       <div v-if="typeof drug.avg_rating === 'number'" class="avg-rating">
         ⭐ 평균 평점 {{ drug.avg_rating.toFixed(1) }} / 5
@@ -32,12 +32,7 @@
           <p class="qr-desc">약국에서 이 QR 코드를 스캔하면 약 정보가 텍스트로 나타나요!</p>
         </div>
 
-        <button 
-          v-if="!showQR" 
-          @click="generateQR" 
-          class="qr-btn"
-          :disabled="qrLoading"
-        >
+        <button v-if="!showQR" @click="generateQR" class="qr-btn" :disabled="qrLoading">
           {{ qrLoading ? 'QR 코드 생성 중...' : '🎫 QR 코드 생성하기' }}
         </button>
 
@@ -46,7 +41,7 @@
           <div class="qr-image-container">
             <img :src="qrImage" alt="약 정보 QR 코드" class="qr-image" />
           </div>
-          
+
           <!-- 약 정보 -->
           <div class="qr-info">
             <p class="qr-drug-name">{{ drug.name }}</p>
@@ -97,7 +92,7 @@
               <li>직원이 스캔하면 약 정보가 <strong>텍스트</strong>로 나타납니다</li>
               <li>약사님이 정보를 확인하고 약을 찾아드립니다</li>
             </ol>
-            
+
           </div>
         </div>
       </section>
@@ -902,15 +897,15 @@ const goHome = () => {
     width: 220px;
     height: 220px;
   }
-  
+
   .qr-actions {
     flex-direction: column;
   }
-  
+
   .qr-actions button {
     width: 100%;
   }
-  
+
   .preview-content {
     font-size: 0.85rem;
   }

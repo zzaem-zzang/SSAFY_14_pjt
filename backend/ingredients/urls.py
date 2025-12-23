@@ -9,7 +9,8 @@ urlpatterns = [
     path('drugs/<int:pk>/', views.drug_detail),
     path('drugs/<int:pk>/comments/', views.create_drug_comment),
     path('drugs/<int:drug_id>/reaction/', views.drug_reaction),
-   
+    path('drugs/popular/views/', views.popular_drugs_by_view),
+
     # --------------------
     # 증상 관련
     # --------------------
@@ -20,7 +21,7 @@ urlpatterns = [
     # --------------------
 
     # urls.py
- 
+    
 
     path("drugs/<int:pk>/ai-summary/", views.drug_ai_summary),
     path("drugs/<int:pk>/ai-image/", views.drug_ai_image),

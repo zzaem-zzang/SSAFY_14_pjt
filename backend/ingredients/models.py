@@ -7,7 +7,12 @@ class Drug(models.Model):
     usage = models.TextField(blank=True, null=True)
     warning = models.TextField(blank=True, null=True)
     image_url = models.URLField(blank=True, null=True)
-
+    image = models.ImageField(
+        upload_to='drugs/',
+        blank=True,
+        null=True
+    )
+    view_count = models.PositiveIntegerField(default=0)
     def __str__(self):
         return self.name
 
