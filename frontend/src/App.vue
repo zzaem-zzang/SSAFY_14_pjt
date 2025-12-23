@@ -8,16 +8,19 @@
           <router-link :to="{ name: 'PostList' }">커뮤니티</router-link>
           <!-- 로그인 완료 상태-->
           <div v-if="auth.isLogin" class="user-menu">
-            <span>{{ auth.user?.username }}님</span>
+            <router-link v-if="auth.isLogin" :to="{ name: 'MyPage' }" class="nickname-link">
+              {{ auth.user?.nickname }}님
+            </router-link>
+
             <button @click="handleLogout" class="logout-btn">로그아웃</button>
           </div>
           <!-- 비로그인 상태 -->
           <div v-else class="auth-links">
             <router-link :to="{ name: 'Login' }" class="login-btn">로그인</router-link>
-          <router-link :to="{ name: 'SignUp' }" class="signup-btn">회원가입</router-link>
+            <router-link :to="{ name: 'SignUp' }" class="signup-btn">회원가입</router-link>
+          </div>
         </div>
       </div>
-    </div>
     </nav>
     <main class="main-content">
       <router-view />
@@ -32,8 +35,8 @@ import { useRouter } from 'vue-router'
 const auth = useAuthStore()
 const router = useRouter()
 
-const handleLogout = () => {
-  auth.logout()
+const handleLogout = async () => {
+  await auth.logout()   // ⭐ 서버 로그아웃 완료까지 대기
   router.push({ name: 'Login' })
 }
 
@@ -57,8 +60,14 @@ body {
   color: #334155;
 }
 
-a { text-decoration: none; color: inherit; }
-button { font-family: inherit; }
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
 
 /* 레이아웃 */
 .navbar {
@@ -93,10 +102,17 @@ button { font-family: inherit; }
   color: #64748b;
 }
 
-.nav-links a:hover { color: black; }
-.nav-links a.router-link-active {  color : black ;font-weight: 700; }
+.nav-links a:hover {
+  color: black;
+}
 
-.login-btn, .logout-btn {
+.nav-links a.router-link-active {
+  color: black;
+  font-weight: 700;
+}
+
+.login-btn,
+.logout-btn {
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 0.9rem;
@@ -124,8 +140,19 @@ button { font-family: inherit; }
 .auth-links {
   display: flex;
   align-items: center;
-  gap: 12px;   /* ← 이 값으로 간격 조절 */
+  gap: 12px;
+  /* ← 이 값으로 간격 조절 */
 }
 
+.nickname-link {
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+}
+
+.nickname-link:hover {
+  text-decoration: underline;
+  color: #4f46e5;
+}
 
 </style>

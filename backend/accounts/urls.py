@@ -5,6 +5,6 @@ urlpatterns = [
     path('register/', views.register),
     path('login/', views.login),
     path('logout/', views.logout),
-    path('user/', views.user_info),
+    path('me/', views.user_info),
+    path('withdraw/', views.withdraw),  # ⭐ 회원탈퇴
 ]
-

@@ -3,24 +3,15 @@ from django.conf import settings
 
 class Drug(models.Model):
     name = models.CharField(max_length=100)
-    effect = models.TextField(blank=True)
-    usage = models.TextField(blank=True)
-    warning = models.TextField(blank=True)
+    effect = models.TextField(blank=True, null=True)
+    usage = models.TextField(blank=True, null=True)
+    warning = models.TextField(blank=True, null=True)
     image_url = models.URLField(blank=True, null=True)
 
     def __str__(self):
         return self.name
 
 
-class Symptom(models.Model):
-    name = models.CharField(max_length=50)
-    drugs = models.ManyToManyField(
-        'Drug',               
-        related_name='symptoms'
-    )
-
-    def __str__(self):
-        return self.name
 
 
 

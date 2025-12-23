@@ -6,18 +6,12 @@
     </div>
 
     <DrugSearch />
-
-    <hr class="divider" />
-
-    <SymptomRecommend />
   </div>
 </template>
 
 <script setup>
 import DrugSearch from '@/components/DrugSearch.vue'
-import SymptomRecommend from '@/components/SymptomRecommend.vue'
 </script>
-
 <style scoped>
 .home-wrapper {
   max-width: 800px;
