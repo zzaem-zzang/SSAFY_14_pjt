@@ -78,6 +78,23 @@ const createMap = (google, location) => {
   return map;
 };
 
+// 정확도를 원형으로 표시하는 함수
+const showAccuracyCircle = (google, location, accuracy) => {
+  // 정확도를 반경으로 하는 원 그리기
+  new google.maps.Circle({
+    map: map,
+    center: location,
+    radius: accuracy,  // 미터 단위
+    fillColor: '#4285F4',
+    fillOpacity: 0.15,
+    strokeColor: '#4285F4',
+    strokeOpacity: 0.4,
+    strokeWeight: 1,
+  });
+  
+  console.log(`🎯 정확도 범위: 약 ${Math.round(accuracy)}m 이내`);
+};
+
 // 주변 약국 검색 함수
 const searchNearbyPharmacies = (google, location) => {
   const service = new google.maps.places.PlacesService(map);
@@ -139,6 +156,13 @@ onMounted(async () => {
 
     // 2. 현재 위치 가져오기
     if (navigator.geolocation) {
+      // 🔥 높은 정확도 옵션 설정
+      const options = {
+        enableHighAccuracy: true,  // 고정밀 위치 사용 (GPS 우선)
+        timeout: 10000,            // 10초 타임아웃
+        maximumAge: 0              // 캐시된 위치 사용 안 함 (항상 새로 가져오기)
+      };
+      
       navigator.geolocation.getCurrentPosition(
         // 성공
         (position) => {
@@ -146,20 +170,43 @@ onMounted(async () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
+          
+          // 정확도 정보 출력
           console.log('📍 현재 위치:', userLocation);
+          console.log('📏 정확도:', position.coords.accuracy, '미터');
+          console.log('🎯 고도:', position.coords.altitude);
+          console.log('⏰ 위치 측정 시간:', new Date(position.timestamp));
 
           createMap(google, userLocation);
           searchNearbyPharmacies(google, userLocation);
+          
+          // 정확도 표시
+          showAccuracyCircle(google, userLocation, position.coords.accuracy);
         },
         // 실패
         (err) => {
-          console.warn('위치 권한 거부:', err);
+          console.warn('위치 권한 거부 또는 실패:', err);
           const defaultLocation = { lat: 37.5665, lng: 126.9780 }; // 서울 시청
           createMap(google, defaultLocation);
           searchNearbyPharmacies(google, defaultLocation);
-          alert('위치 권한이 거부되었습니다. 기본 위치(서울)로 표시합니다.');
+          
+          // 에러 타입별 메시지
+          let errorMsg = '위치를 가져올 수 없습니다.';
+          switch(err.code) {
+            case err.PERMISSION_DENIED:
+              errorMsg = '위치 권한이 거부되었습니다. 기본 위치(서울)로 표시합니다.';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              errorMsg = '위치 정보를 사용할 수 없습니다. 기본 위치(서울)로 표시합니다.';
+              break;
+            case err.TIMEOUT:
+              errorMsg = '위치 요청 시간이 초과되었습니다. 기본 위치(서울)로 표시합니다.';
+              break;
+          }
+          alert(errorMsg);
           loading.value = false;
-        }
+        },
+        options  // 🔥 옵션 적용
       );
     } else {
       // 브라우저가 위치 정보 미지원
