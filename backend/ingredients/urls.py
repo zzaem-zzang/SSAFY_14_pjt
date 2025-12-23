@@ -25,5 +25,13 @@ urlpatterns = [
 
     path("drugs/<int:pk>/ai-summary/", views.drug_ai_summary),
     path("drugs/<int:pk>/ai-image/", views.drug_ai_image),
+    
+    # --------------------
+    # ⭐ QR코드 관련 
+    # --------------------
+    
+    path('drugs/<int:drug_id>/qr/', views.generate_drug_qr, name='drug-qr')
+    
+    
 ]
 

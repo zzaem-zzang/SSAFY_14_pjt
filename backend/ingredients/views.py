@@ -38,6 +38,14 @@ from .serializers import (
     DrugDetailSerializer,
 )
 
+# ========================
+# qrcode
+# ========================
+import qrcode
+from io import BytesIO
+import base64
+from urllib.parse import quote
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
 
@@ -599,3 +607,57 @@ Style: flat medical illustration, infographic, clean, professional
             {"detail": "서버 내부 오류", "error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        
+        
+
+@api_view(['GET'])
+def generate_drug_qr(request, drug_id):
+    """약 정보를 QR 코드로 생성 (JSON 포맷)"""
+    try:
+        from .models import Drug
+        drug = Drug.objects.get(pk=drug_id)
+        
+        # 🔥 약 정보를 JSON으로 담기
+        drug_info = {
+            '약품명': drug.name,
+            '효능효과': drug.effect[:200] if drug.effect else '정보 없음',
+            '용법용량': drug.usage[:200] if drug.usage else '정보 없음',
+            '주의사항': drug.warning[:200] if drug.warning else '정보 없음',
+        }
+        
+        # JSON을 보기 좋게 포맷팅
+        qr_data = json.dumps(drug_info, ensure_ascii=False, indent=2)
+        
+        print(f"✅ QR에 담긴 정보:\n{qr_data}")
+        
+        # QR 코드 생성
+        qr = qrcode.QRCode(
+            version=None,  # 자동으로 크기 조정
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        
+        # 이미지 생성
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # base64로 인코딩
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+        
+        return Response({
+            'qr_image': f'data:image/png;base64,{img_base64}',
+            'drug_info': drug_info,
+            'drug_name': drug.name
+        })
+        
+    except Drug.DoesNotExist:
+        return Response({'error': '약 정보를 찾을 수 없습니다.'}, status=404)
+    except Exception as e:
+        print(f"❌ QR 생성 에러: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({'error': str(e)}, status=500)
