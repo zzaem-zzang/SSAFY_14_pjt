@@ -2,15 +2,16 @@
   <section class="search-section">
     <!-- 🔍 검색 타입 선택 -->
     <div class="search-type">
-      <label>
+      <label class="radio-option">
         <input type="radio" value="drug" v-model="searchType" />
-        약 이름
+        <span class="radio-label">약 이름</span>
       </label>
-      <label>
+      <label class="radio-option">
         <input type="radio" value="symptom" v-model="searchType" />
-        증상
+        <span class="radio-label">증상</span>
       </label>
     </div>
+    
     <div class="search-bar">
       <input v-model="keyword" :placeholder="searchType === 'drug'
         ? '약 이름 (예: 타이레놀)'
@@ -30,8 +31,6 @@
         평점순
       </button>
     </div>
-
-
 
     <div v-if="loading" class="status-msg">
       <span class="spinner"></span> 검색 중입니다...
@@ -95,7 +94,6 @@ const setOrder = (value) => {
   search()
 }
 
-
 const search = async () => {
   if (!keyword.value.trim()) return
 
@@ -137,9 +135,6 @@ const search = async () => {
   }
 }
 
-
-
-
 const goDetail = (id) => {
   router.push({
     path: `/drugs/${id}`,
@@ -148,12 +143,43 @@ const goDetail = (id) => {
     }
   })
 }
-
 </script>
 
 <style scoped>
 .search-section {
   width: 100%;
+}
+
+/* 검색 타입 선택 */
+.search-type {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.radio-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4f46e5;
+  /* 라디오 버튼 테두리 강조 */
+  border: 2px solid #4f46e5;
+  appearance: auto;
+}
+
+.radio-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b; /* 진한 색상으로 변경 */
+  cursor: pointer;
 }
 
 /* 검색창 스타일 */
@@ -163,8 +189,9 @@ const goDetail = (id) => {
   background: white;
   padding: 8px;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  /* 테두리 제거 */
+  border: none;
 }
 
 input {
@@ -174,19 +201,26 @@ input {
   padding: 12px 16px;
   outline: none;
   border-radius: 12px;
+  color: #1e293b;
+  background: transparent;
 }
 
+input::placeholder {
+  color: #94a3b8;
+}
+
+input:focus {
+  background: #f8fafc;
+}
 
 /* 이미지 래퍼: 높이를 고정하고 넘치는 부분 숨김 */
 .image-wrap {
   width: 100%;
   height: 160px;
-  /* 적절한 높이 설정 */
   overflow: hidden;
   border-radius: 12px;
   margin-bottom: 12px;
   background-color: #f8fafc;
-  /* 이미지가 없을 때 회색 배경 */
 }
 
 /* 이미지 본체: 꽉 채우되 비율 유지 */
@@ -194,11 +228,8 @@ input {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* 찌그러지지 않고 영역에 꽉 차게 */
   display: block;
 }
-
-/* ... 나머지 스타일 ... */
 
 .btn-search {
   background: #4f46e5;
@@ -208,11 +239,17 @@ input {
   border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 .btn-search:hover {
   background: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.btn-search:active {
+  transform: translateY(0);
 }
 
 /* 결과 그리드 */
@@ -236,6 +273,12 @@ input {
   transform: translateY(-4px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   border-color: #4f46e5;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .card-header h3 {
@@ -272,6 +315,13 @@ input {
   text-align: center;
   margin-top: 40px;
   color: #64748b;
+  font-size: 1rem;
+}
+
+.status-msg.empty {
+  padding: 40px;
+  background: #f8fafc;
+  border-radius: 12px;
 }
 
 .error-msg {
@@ -290,15 +340,99 @@ input {
 }
 
 .sort-bar button {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
   background: white;
   cursor: pointer;
+  font-weight: 500;
+  color: #64748b;
+  transition: all 0.2s ease;
+}
+
+.sort-bar button:hover {
+  border-color: #4f46e5;
+  color: #4f46e5;
 }
 
 .sort-bar button.active {
   background: #4f46e5;
   color: white;
+  border-color: #4f46e5;
+}
+
+/* 스피너 애니메이션 */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .search-type {
+    gap: 20px;
+  }
+
+  .radio-label {
+    font-size: 0.95rem;
+  }
+
+  .search-bar {
+    gap: 10px;
+    padding: 6px;
+  }
+
+  input {
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  .btn-search {
+    padding: 0 20px;
+    font-size: 0.95rem;
+  }
+
+  .result-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search-type {
+    gap: 16px;
+  }
+
+  .radio-option input[type="radio"] {
+    width: 16px;
+    height: 16px;
+  }
+
+  .radio-label {
+    font-size: 0.9rem;
+  }
+
+  .search-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn-search {
+    width: 100%;
+    padding: 12px;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

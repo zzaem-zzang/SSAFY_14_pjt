@@ -2,7 +2,7 @@
   <div class="app-container">
     <nav class="navbar">
       <div class="nav-content">
-        <router-link to="/" class="logo">💊 MediSearch</router-link>
+        <router-link to="/" class="logo">💊 MediClinic</router-link>
         <div class="nav-links">
           <router-link to="/">홈</router-link>
           <router-link :to="{ name: 'PostList' }">커뮤니티</router-link>
@@ -18,6 +18,7 @@
           <div v-else class="auth-links">
             <router-link :to="{ name: 'Login' }" class="login-btn">로그인</router-link>
             <router-link :to="{ name: 'SignUp' }" class="signup-btn">회원가입</router-link>
+            <router-link :to="{ name: 'PharmacyMap' }" class="pharmacy-link">근처약국</router-link>
           </div>
         </div>
       </div>
