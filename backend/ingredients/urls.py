@@ -24,7 +24,7 @@ urlpatterns = [
     
 
     path("drugs/<int:pk>/ai-summary/", views.drug_ai_summary),
-    path("drugs/<int:pk>/ai-image/", views.drug_ai_image),
+    path("drugs/<int:pk>/chat/", views.drug_chat, name="drug_chat"),
     
     # --------------------
     # ⭐ QR코드 관련 
