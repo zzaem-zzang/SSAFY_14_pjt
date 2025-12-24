@@ -6,7 +6,6 @@ from django.shortcuts import get_object_or_404
 
 from .models import Post, Comment
 from .serializers import PostListSerializer, PostDetailSerializer, CommentSerializer
-from .permissions import IsAuthorOrAdmin
 
 # 게시글 목록 / 생성
 @api_view(['GET', 'POST'])
