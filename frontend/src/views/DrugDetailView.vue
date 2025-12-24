@@ -140,18 +140,34 @@
         </div>
       </section>
 
-      <!-- 🖼️ AI 이미지 -->
-      <section class="ai-image">
-        <button @click="generateAiImage" :disabled="imageLoading">
-          {{ imageLoading ? '이미지 생성 중...' : 'AI 이미지 생성' }}
-        </button>
+      <!-- DrugDetailView.vue (상세페이지 하단쯤) -->
+      <!-- ✅ 기존 <section class="chatbot"> 를 아래로 교체 -->
+      <section class="info-section chatbot-section">
+        <h3>💬 이 약에 대해 물어보세요</h3>
 
-        <p v-if="imageError" class="error">{{ imageError }}</p>
+        <div class="chat-panel">
+          <div class="chat-log">
+            <div v-for="(m, i) in chat" :key="i" :class="['msg', m.role]">
+              <div class="bubble">{{ m.text }}</div>
+            </div>
+            <div v-if="chatLoading" class="msg bot">
+              <div class="bubble">답변 생성 중...</div>
+            </div>
+          </div>
 
-        <div v-if="aiImage" class="image-wrap">
-          <img :src="aiImage" alt="AI 생성 이미지" />
+          <div class="quick">
+            <button v-for="s in suggestions" :key="s" @click="send(s)">{{ s }}</button>
+          </div>
+
+          <div class="chat-input">
+            <input v-model="userMsg" @keyup.enter="send()" placeholder="요기에 입력하세요 !!! " />
+            <button @click="send()" :disabled="chatLoading || !userMsg.trim()">전송</button>
+          </div>
         </div>
       </section>
+
+
+
 
       <div class="card-footer">
         <button class="back-btn" @click="goHome">목록으로</button>
@@ -405,20 +421,164 @@ async function createComment() {
 }
 
 const goHome = () => {
-  const keyword = route.query.keyword
-
-  if (keyword) {
+  if (Object.keys(route.query).length > 0) {
     router.push({
       path: '/',
-      query: { keyword }
+      query: route.query   // ⭐ query 통째로 복원
     })
   } else {
     router.push('/')
   }
 }
+
+
+// ✅ 챗봇 상태
+const chat = ref([
+  { role: 'bot', text: '이 약에 무엇이든 궁금한 걸 물어보세요! ❤️' }
+])
+const userMsg = ref('')
+const chatLoading = ref(false)
+const suggestions = ref(['효능', '복용법', '주의사항', '부작용'])
+
+// ✅ 메시지 전송
+const send = async (preset) => {
+  const msg = (preset ?? userMsg.value).trim()
+  if (!msg || chatLoading.value) return
+
+  chat.value.push({ role: 'user', text: msg })
+  userMsg.value = ''
+  chatLoading.value = true
+
+  try {
+    // ⚠️ 백엔드에 /drugs/<id>/chat/ 엔드포인트가 있어야 함
+    const res = await api.post(`/drugs/${route.params.id}/chat/`, { message: msg })
+
+    chat.value.push({ role: 'bot', text: res.data.reply })
+
+    // 서버에서 suggestions 내려주면 갱신
+    if (Array.isArray(res.data.suggestions)) {
+      suggestions.value = res.data.suggestions
+    }
+  } catch (e) {
+    chat.value.push({ role: 'bot', text: '오류가 발생했어요. 잠시 후 다시 시도해 주세요.' })
+  } finally {
+    chatLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
+/* ✅ 챗봇 섹션: info-section 스타일을 베이스로 */
+.chatbot-section {
+  margin: 30px;
+}
+
+/* ✅ 챗봇 내부 패널(본문) */
+.chat-panel {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* ✅ 로그 영역: info-section 본문 느낌 */
+.chat-log {
+  max-height: 320px;
+  overflow: auto;
+  padding: 30px;
+  background: #f8fafc;
+  /* card-body 톤이랑 맞춤 */
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+/* ✅ 말풍선 */
+.msg {
+  display: flex;
+  margin: 8px 0;
+}
+
+.msg.user {
+  justify-content: flex-end;
+}
+
+.msg.bot {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 80%;
+  white-space: pre-line;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #4f46e5;
+  line-height: 1.6;
+}
+
+/* 사용자 말풍선만 은은하게 강조 (효능 섹션의 보라톤과 톤 맞춤) */
+.msg.user .bubble {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+/* ✅ 빠른 버튼 */
+.quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  margin-left: 30px;
+}
+
+.quick button {
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+  font-weight: 600;
+  color: #4f46e5;
+  /* info-section h3 색과 통일 */
+}
+
+.quick button:hover {
+  background: #f1f5f9;
+}
+
+/* ✅ 입력창 */
+.chat-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.chat-input button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #4f46e5;
+  /* 메인 컬러 */
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chat-input button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+
 .detail-container {
   display: flex;
   justify-content: center;
@@ -629,35 +789,35 @@ const goHome = () => {
   color: #475569;
 }
 
-.ai-image {
-  margin: 30px;
+
+
+/* ✅ 카드 폭 끝까지(이미 적용한 full-bleed 유지) */
+.ai-image.full-bleed {
+  margin: 0;
+  padding: 30px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
 }
 
-.ai-image button {
-  padding: 10px 20px;
-  border-radius: 10px;
-  background: #4f46e5;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-.ai-image button:hover {
-  background: #4338ca;
-}
-
-.ai-image button:disabled {
-  background: #94a3b8;
-  cursor: not-allowed;
-}
-
-.ai-image img {
+/* ✅ 프레임 크기: 높이를 확 키움 (반응형) */
+.ai-image-frame {
   margin-top: 16px;
   width: 100%;
-  max-height: 420px;
-  object-fit: contain;
+  height: clamp(320px, 55vw, 700px);
+  /* ✅ 여기서 커짐 */
   background: white;
   border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+/* ✅ 프레임을 꽉 채우기 (잘려도 시원하게) */
+.ai-image-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 안 잘리게 전체 보이려면 contain */
+  display: block;
 }
 
 /* 🎫 QR 코드 스타일 */

@@ -2,7 +2,7 @@
   <div class="app-container">
     <nav class="navbar">
       <div class="nav-content">
-        <router-link to="/" class="logo">💊 MediClinic</router-link>
+        <router-link to="/" class="logo">💊 DZip</router-link>
         <div class="nav-links">
           <router-link to="/">홈</router-link>
           <router-link :to="{ name: 'PostList' }">커뮤니티</router-link>
@@ -18,8 +18,9 @@
           <div v-else class="auth-links">
             <router-link :to="{ name: 'Login' }" class="login-btn">로그인</router-link>
             <router-link :to="{ name: 'SignUp' }" class="signup-btn">회원가입</router-link>
-            <router-link :to="{ name: 'PharmacyMap' }" class="pharmacy-link">근처약국</router-link>
+            
           </div>
+        <router-link :to="{ name: 'PharmacyMap' }" class="pharmacy-link">근처약국</router-link>
         </div>
       </div>
     </nav>
@@ -89,10 +90,32 @@ button {
   justify-content: space-between;
 }
 
+/* 기존 .logo를 아래 내용으로 변경하거나 덮어쓰세요 */
 .logo {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 800;
-  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  
+  /* 그라데이션 텍스트 설정 */
+  background: linear-gradient(120deg, #4f46e5, #9333ea, #4f46e5);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 3s linear infinite;
+  transition: transform 0.3s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05); /* 마우스 올리면 살짝 커짐 */
+}
+
+
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
 }
 
 .nav-links {
@@ -155,5 +178,11 @@ button {
   text-decoration: underline;
   color: #4f46e5;
 }
+.pharmacy-link {
+ display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 
 </style>

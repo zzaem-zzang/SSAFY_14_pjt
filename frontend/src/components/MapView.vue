@@ -23,7 +23,7 @@ const loading = ref(true);
 const error = ref(null);
 let map = null;
 
-// Google Maps 스크립트를 동적으로 로드하는 함수
+// ✅ Google Maps 스크립트를 최신 방식으로 로드
 const loadGoogleMapsScript = () => {
   return new Promise((resolve, reject) => {
     // 이미 로드되어 있으면 바로 리턴
@@ -32,11 +32,12 @@ const loadGoogleMapsScript = () => {
       return;
     }
 
-    // script 태그 생성
+    // script 태그 생성 - v=beta 추가 (최신 버전)
     const script = document.createElement('script');
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=ko`;
+    // ✅ loading=async 추가하여 경고 제거
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&loading=async&language=ko&v=beta`;
     script.async = true;
     script.defer = true;
 
@@ -55,36 +56,64 @@ const loadGoogleMapsScript = () => {
 };
 
 // 지도 생성 함수
-const createMap = (google, location) => {
-  map = new google.maps.Map(mapDiv.value, {
+const createMap = async (google, location) => {
+  // ✅ 최신 방식: google.maps.Map 생성
+  const { Map } = await google.maps.importLibrary("maps");
+  
+  map = new Map(mapDiv.value, {
     center: location,
     zoom: 15,
     mapTypeControl: true,
     streetViewControl: true,
     fullscreenControl: true,
-  });
-
-  // 현재 위치에 빨간 마커
-  new google.maps.Marker({
-    position: location,
-    map: map,
-    title: '현재 위치',
-    icon: {
-      url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
-    }
+    mapId: 'DEMO_MAP_ID' // AdvancedMarkerElement 사용을 위해 필요
   });
 
   console.log('✅ 지도 생성 완료');
   return map;
 };
 
-// 정확도를 원형으로 표시하는 함수
+// ✅ 최신 방식으로 마커 생성
+const createUserMarker = async (google, location) => {
+  try {
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+    
+    // 사용자 위치 마커 (빨간색)
+    const markerContent = document.createElement('div');
+    markerContent.innerHTML = `
+      <div style="
+        width: 30px;
+        height: 30px;
+        background: #ef4444;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      "></div>
+    `;
+    
+    new AdvancedMarkerElement({
+      map: map,
+      position: location,
+      content: markerContent,
+      title: '현재 위치'
+    });
+  } catch (e) {
+    console.error('마커 생성 실패:', e);
+    // 폴백: 기본 마커 사용
+    new google.maps.Marker({
+      position: location,
+      map: map,
+      title: '현재 위치'
+    });
+  }
+};
+
+// 정확도 원 표시
 const showAccuracyCircle = (google, location, accuracy) => {
-  // 정확도를 반경으로 하는 원 그리기
   new google.maps.Circle({
     map: map,
     center: location,
-    radius: accuracy,  // 미터 단위
+    radius: accuracy,
     fillColor: '#4285F4',
     fillOpacity: 0.15,
     strokeColor: '#4285F4',
@@ -95,42 +124,117 @@ const showAccuracyCircle = (google, location, accuracy) => {
   console.log(`🎯 정확도 범위: 약 ${Math.round(accuracy)}m 이내`);
 };
 
-// 주변 약국 검색 함수
-const searchNearbyPharmacies = (google, location) => {
+// ✅ 최신 Places API 사용
+const searchNearbyPharmacies = async (google, location) => {
+  try {
+    // ✅ 새로운 방식: places library 사용
+    const { Place } = await google.maps.importLibrary("places");
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+    
+    // Nearby Search 요청
+    const request = {
+      textQuery: '약국',
+      fields: ['displayName', 'location', 'formattedAddress', 'rating'],
+      locationBias: {
+        center: location,
+        radius: 2000 // 2km
+      },
+      language: 'ko',
+      maxResultCount: 20,
+    };
+
+    // ✅ 새로운 API: Place.searchNearby 대신 textSearch 사용
+    const { places } = await Place.searchByText(request);
+
+    if (places && places.length > 0) {
+      console.log(`✅ 약국 ${places.length}개 발견`);
+
+      places.forEach((place) => {
+        // 마커 생성 (파란색)
+        const markerContent = document.createElement('div');
+        markerContent.innerHTML = `
+          <div style="
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          "></div>
+        `;
+
+        const marker = new AdvancedMarkerElement({
+          map: map,
+          position: place.location,
+          content: markerContent,
+          title: place.displayName
+        });
+
+        // 정보창
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="padding: 12px; min-width: 200px;">
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: #1e293b;">
+                ${place.displayName || place.formattedAddress}
+              </h3>
+              ${place.formattedAddress ? 
+                `<p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                  📍 ${place.formattedAddress}
+                </p>` : ''}
+              ${place.rating ? 
+                `<p style="margin: 0; font-size: 14px; color: #f59e0b; font-weight: 600;">
+                  ⭐ ${place.rating} / 5
+                </p>` : ''}
+            </div>
+          `
+        });
+
+        marker.addListener('click', () => {
+          infoWindow.open(map, marker);
+        });
+      });
+
+      loading.value = false;
+    } else {
+      console.log('주변 약국을 찾을 수 없습니다');
+      loading.value = false;
+    }
+  } catch (e) {
+    console.error('약국 검색 실패:', e);
+    
+    // ✅ 폴백: 기존 PlacesService 사용 (deprecated 경고 발생)
+    searchNearbyPharmaciesFallback(google, location);
+  }
+};
+
+// 폴백 함수 (구버전 API)
+const searchNearbyPharmaciesFallback = (google, location) => {
   const service = new google.maps.places.PlacesService(map);
 
   const request = {
     location: location,
-    radius: 2000, // 2km
+    radius: 2000,
     type: 'pharmacy',
     keyword: '약국'
   };
 
   service.nearbySearch(request, (results, status) => {
     if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-      console.log(`✅ 약국 ${results.length}개 발견`);
+      console.log(`✅ 약국 ${results.length}개 발견 (구버전 API)`);
 
       results.forEach((place) => {
         const marker = new google.maps.Marker({
           position: place.geometry.location,
           map: map,
-          title: place.name,
-          icon: {
-            url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-          }
+          title: place.name
         });
 
-        // 정보창
         const infoWindow = new google.maps.InfoWindow({
           content: `
-            <div style="padding: 10px; min-width: 200px;">
-              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">${place.name}</h3>
-              <p style="margin: 0; font-size: 14px; color: #666; line-height: 1.4;">${place.vicinity}</p>
-              ${place.rating ? `<p style="margin: 8px 0 0 0; font-size: 14px;">⭐ ${place.rating} / 5</p>` : ''}
-              ${place.opening_hours ? 
-                `<p style="margin: 4px 0 0 0; font-size: 13px; color: ${place.opening_hours.open_now ? '#0a0' : '#a00'};">
-                  ${place.opening_hours.open_now ? '✅ 영업 중' : '❌ 영업 종료'}
-                </p>` : ''}
+            <div style="padding: 12px; min-width: 200px;">
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: #1e293b;">${place.name}</h3>
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b; line-height: 1.5;">📍 ${place.vicinity}</p>
+              ${place.rating ? `<p style="margin: 0; font-size: 14px; color: #f59e0b; font-weight: 600;">⭐ ${place.rating} / 5</p>` : ''}
             </div>
           `
         });
@@ -150,47 +254,39 @@ const searchNearbyPharmacies = (google, location) => {
 
 onMounted(async () => {
   try {
-    // 1. Google Maps 스크립트 로드
     console.log('구글맵 로딩 시작...');
     const google = await loadGoogleMapsScript();
 
-    // 2. 현재 위치 가져오기
     if (navigator.geolocation) {
-      // 🔥 높은 정확도 옵션 설정
       const options = {
-        enableHighAccuracy: true,  // 고정밀 위치 사용 (GPS 우선)
-        timeout: 10000,            // 10초 타임아웃
-        maximumAge: 0              // 캐시된 위치 사용 안 함 (항상 새로 가져오기)
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
       };
       
       navigator.geolocation.getCurrentPosition(
-        // 성공
-        (position) => {
+        async (position) => {
           const userLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
           
-          // 정확도 정보 출력
           console.log('📍 현재 위치:', userLocation);
           console.log('📏 정확도:', position.coords.accuracy, '미터');
-          console.log('🎯 고도:', position.coords.altitude);
-          console.log('⏰ 위치 측정 시간:', new Date(position.timestamp));
 
-          createMap(google, userLocation);
-          searchNearbyPharmacies(google, userLocation);
-          
-          // 정확도 표시
+          await createMap(google, userLocation);
+          await createUserMarker(google, userLocation);
           showAccuracyCircle(google, userLocation, position.coords.accuracy);
+          await searchNearbyPharmacies(google, userLocation);
         },
-        // 실패
-        (err) => {
+        async (err) => {
           console.warn('위치 권한 거부 또는 실패:', err);
-          const defaultLocation = { lat: 37.5665, lng: 126.9780 }; // 서울 시청
-          createMap(google, defaultLocation);
-          searchNearbyPharmacies(google, defaultLocation);
+          const defaultLocation = { lat: 37.5665, lng: 126.9780 };
           
-          // 에러 타입별 메시지
+          await createMap(google, defaultLocation);
+          await createUserMarker(google, defaultLocation);
+          await searchNearbyPharmacies(google, defaultLocation);
+          
           let errorMsg = '위치를 가져올 수 없습니다.';
           switch(err.code) {
             case err.PERMISSION_DENIED:
@@ -206,13 +302,13 @@ onMounted(async () => {
           alert(errorMsg);
           loading.value = false;
         },
-        options  // 🔥 옵션 적용
+        options
       );
     } else {
-      // 브라우저가 위치 정보 미지원
       const defaultLocation = { lat: 37.5665, lng: 126.9780 };
-      createMap(google, defaultLocation);
-      searchNearbyPharmacies(google, defaultLocation);
+      await createMap(google, defaultLocation);
+      await createUserMarker(google, defaultLocation);
+      await searchNearbyPharmacies(google, defaultLocation);
       loading.value = false;
     }
 

@@ -8,12 +8,7 @@
           <div class="meta">
             <strong class="author">작성자 : {{ post.author.nickname }}</strong>
 
-            <span v-if="post.avg_rating" class="rating">
-              ⭐ {{ post.avg_rating.toFixed(1) }} / 5
-            </span>
-            <span v-else class="rating empty">
-              ⭐ 아직 별점 없음
-            </span>
+
           </div>
 
         </div>
@@ -31,26 +26,30 @@
 
         <ul class="comment-list">
           <li v-for="c in post.comments" :key="c.id" class="comment-item">
-            <div class="comment-author">{{ c.author.nickname }}</div>
-            <div class="comment-text">{{ c.content }}</div>
+            <div class="comment-header">
+              <div class="comment-author">
+                {{ c.author.nickname }}
+              </div>
+
+              <button v-if="auth.isLogin && auth.user.id === c.author.id" class="btn btn-delete comment-delete"
+                @click="deleteComment(c.id)">
+                삭제
+              </button>
+
+            </div>
+
+            <div class="comment-text">
+              {{ c.content }}
+            </div>
           </li>
+
           <li v-if="post.comments.length === 0" class="empty-comment">
             첫 번째 댓글을 남겨보세요!
           </li>
         </ul>
 
+
         <div v-if="auth.isLogin" class="comment-form">
-
-          <!-- ⭐ 별점 입력 -->
-          <div class="star-rating">
-            <span v-for="i in 5" :key="i" class="star" :class="{
-              active: i <= (hoverRating || rating)
-            }" @mouseenter="setHover(i)" @mouseleave="clearHover" @click="setRating(i)">
-              ★
-            </span>
-          </div>
-
-
           <textarea v-model="newComment" placeholder="댓글을 입력하세요..." rows="3"></textarea>
 
           <button @click="createComment" class="btn-submit">
@@ -80,22 +79,7 @@ const router = useRouter()
 const post = ref(null)
 const newComment = ref('')
 const auth = useAuthStore()
-const rating = ref(0)
-const hoverRating = ref(0)  // 마우스 올렸을 때 임시 별점
 
-
-// 별 클릭
-function setRating(value) {
-  rating.value = value
-}
-
-function setHover(value) {
-  hoverRating.value = value
-}
-
-function clearHover() {
-  hoverRating.value = 0
-}
 // 게시글 불러오기
 async function load() {
   try {
@@ -123,6 +107,21 @@ async function deletePost() {
   }
 }
 
+// 댓글 삭제
+async function deleteComment(commentId) {
+  if (!confirm('댓글을 삭제하시겠습니까?')) return
+
+  try {
+    await api.delete(
+      `/posts/${post.value.id}/comments/${commentId}/`
+    )
+    await load()
+  } catch (err) {
+    alert('댓글 삭제 실패')
+  }
+}
+
+
 // 댓글 작성
 async function createComment() {
   if (!newComment.value.trim()) return
@@ -130,11 +129,10 @@ async function createComment() {
   try {
     await api.post(`/posts/${route.params.id}/comments/`, {
       content: newComment.value,
-      rating: rating.value || null
     })
     await load()
     newComment.value = ''
-    rating.value = 0
+
   } catch (err) {
     alert('댓글 작성 실패')
   }
@@ -303,45 +301,14 @@ textarea:focus {
   font-weight: 600;
   text-decoration: underline;
 }
-
-.rating {
-  margin-left: 12px;
-  font-weight: 600;
-  color: #f59e0b;
+.comment-delete {
+  padding: 4px 10px;
+  font-size: 0.75rem;
 }
-
-.rating.empty {
-  color: #94a3b8;
-}
-
-.rating-select {
-  align-self: flex-start;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-}
-
-
-.star-rating {
+.comment-header {
   display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
+  justify-content: space-between; /* ⬅ 왼쪽 / 오른쪽 끝 */
+  align-items: center;
 }
 
-.star {
-  font-size: 1.8rem;
-  color: #e5e7eb;
-  /* 회색 별 */
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.star.active {
-  color: #facc15;
-  /* 노란 별 */
-}
-
-.star:hover {
-  color: #fde047;
-}
 </style>
