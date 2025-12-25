@@ -337,171 +337,102 @@ def drug_ai_summary(request, pk):
     })
 
 
+# ai 챗봇 
+SYSTEM_PROMPT = """
+너는 의약품 정보를 친절하게 설명해주는 AI 어시스턴트야.
+전문 용어는 최대한 쉽게 풀어서 설명해 줘.
+이 약과 직접 관련 없는 내용은 추측하지 말고,
+의학적 판단이나 처방이 필요한 경우에는
+자연스럽게 의료진 상담을 권장해 줘.
+"""
 
+def build_context(drug):
+    return f"""
+다음은 특정 의약품에 대한 공식 정보입니다.
+이 정보는 참고용 컨텍스트입니다.
 
-
-# 이미지
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def drug_ai_image(request, pk):
-    """
-    POST /drugs/<pk>/ai-image/
-    - Gemini 2.0 Flash Exp Image Generation으로 의학 인포그래픽 생성
-    """
-    drug = get_object_or_404(Drug, pk=pk)
-    one_liner = ""
-    cautions = []
-    
-    # 1️⃣ AI 요약 로드 (없으면 기본값 사용)
-    try:
-        summary = drug.ai_summary
-        one_liner = summary.one_liner
-        cautions = summary.cautions
-        logger.info(f"AI 요약 사용 - Drug: {drug.name}")
-    except DrugAiSummary.DoesNotExist:
-        one_liner = drug.effect[:100] if drug.effect else "증상 완화"
-        cautions = []
-        logger.info(f"AI 요약 없음, 기본값 사용 - Drug: {drug.name}")
-
-    # 2️⃣ 영어 프롬프트 작성 (이미지 생성 모델은 영어가 더 효과적)
-    image_prompt = f"""Create a medical infographic illustration:
-
-Medicine: {drug.name}
-Main Effect: {one_liner}
-Details: {drug.effect[:200] if drug.effect else 'General symptom relief'}
-Cautions: {', '.join(cautions[:2]) if cautions else 'Standard precautions'}
-
-Visual Requirements:
-- Full human body (front view, standing position)
-- Soft GREEN GLOW on body areas where symptoms are relieved
-- Soft RED GLOW on areas with potential side effects
-- White or light gray background
-- Flat medical illustration, infographic style
-- Label major organs in Korean (한국어)
-- Clean, professional, high clarity
-- Gradient effect: colors fade as distance increases from affected areas
-- NO scary or exaggerated expressions
-
-Style: flat medical illustration, infographic, clean, professional
+약 이름: {drug.name}
+효능: {drug.effect or "정보 없음"}
+복용 방법: {drug.usage or "정보 없음"}
+주의사항: {drug.warning or "정보 없음"}
 """
 
 
-    logger.info(f"=== 이미지 생성 시작: {drug.name} ===")
-    logger.info(f"프롬프트 길이: {len(image_prompt)} chars")
-    
-    gemini_payload = {
-        "contents": [{
-            "parts": [{
-                "text": image_prompt
-            }]
-        }],
-        "generationConfig": {
-            "responseModalities": ["Text", "Image"]  # ⭐ Text와 Image 둘 다 요청
-        }
+
+def extract_reply_from_response(data):
+    try:
+        for item in data.get("output", []):
+            if item.get("role") == "assistant":
+                for c in item.get("content", []):
+                    if c.get("type") == "output_text":
+                        return c.get("text")
+    except Exception as e:
+        logger.error(f"❌ 응답 파싱 실패: {e}")
+    return None
+
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def drug_chat(request, pk):
+    drug = get_object_or_404(Drug, pk=pk)
+    user_msg = request.data.get("message", "").strip()
+
+    if not user_msg:
+        return Response(
+            {"reply": "질문을 입력해 주세요.\n※ 의료적 판단/처방이 아닌 정보 제공 목적입니다."},
+            status=400
+        )
+
+    url = f"{settings.OPENAI_BASE_URL}/responses"
+
+    payload = {
+    "model": "gpt-5-nano",
+    "instructions": SYSTEM_PROMPT,
+    "input": f"""
+    {build_context(drug)}
+
+    사용자 질문:
+    {user_msg}
+    """.strip(),
+        "reasoning": {"effort": "low"},
+        
     }
 
-    try:
-        res = requests.post(
-            GMS_GEMINI_IMAGE_URL,
-            params={"key": settings.GMS_KEY},
-            json=gemini_payload,
-            timeout=60,
-        )
-        
-        logger.info(f"Gemini 응답 상태: {res.status_code}")
 
-        if res.status_code != 200:
-            # 에러 응답 상세 로깅
-            try:
-                error_data = res.json()
-                logger.error(f"Gemini 에러 JSON: {error_data}")
-            except:
-                logger.error(f"Gemini 에러 TEXT: {res.text[:500]}")
-            
-            return Response(
-                {
-                    "detail": "이미지 생성 실패",
-                    "status_code": res.status_code,
-                    "error": res.text[:500],
-                },
-                status=status.HTTP_502_BAD_GATEWAY
-            )
+    headers = {
+        "Authorization": f"Bearer {settings.GMS_KEY}",
+        "Content-Type": "application/json",
+    }
 
+    r = requests.post(url, json=payload, headers=headers, timeout=30)
 
-        data = res.json()
-        logger.info(f"응답 키: {list(data.keys())}")
-
-
-        # 4️⃣ base64 이미지 추출
-        if "candidates" not in data:
-            logger.error(f"candidates 없음. 응답: {str(data)[:300]}")
-            return Response(
-                {
-                    "detail": "이미지 생성 실패: 잘못된 응답 형식",
-                    "response": str(data)[:500]
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        
-        parts = data["candidates"][0]["content"]["parts"]
-        logger.info(f"Parts 개수: {len(parts)}")
-        
-        # 각 part를 순회하며 이미지 찾기
-        for i, p in enumerate(parts):
-            logger.info(f"Part {i} 키: {list(p.keys())}")
-            
-            if "inlineData" in p:
-                mime_type = p["inlineData"]["mimeType"]
-                base64_data = p["inlineData"]["data"]
-                logger.info(f"✅ 이미지 생성 성공! MIME: {mime_type}, 크기: {len(base64_data)} chars")
-                
-                return Response({
-                    "mime_type": mime_type,
-                    "base64": base64_data,
-                })
-
-        # 이미지가 없고 텍스트만 있는 경우
-        logger.warning("이미지 없음, 텍스트만 반환됨")
-        text_content = ""
-        for p in parts:
-            if "text" in p:
-                text_content = p["text"][:200]
-                break
-        
+    if r.status_code != 200:
+        logger.error(f"❌ OpenAI Error {r.status_code}: {r.text}")
         return Response(
-            {
-                "detail": "이미지 생성 실패: Gemini가 텍스트만 반환했습니다.",
-                "text_preview": text_content
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-
-        )
-        
-    except requests.exceptions.Timeout:
-        logger.error("Gemini API 타임아웃 (60초)")
-        return Response(
-            {"detail": "이미지 생성 시간 초과"},
-            status=status.HTTP_504_GATEWAY_TIMEOUT
+            {"reply": "AI 응답 생성 실패\n※ 의료적 판단/처방이 아닌 정보 제공 목적입니다."},
+            status=500
         )
 
-    except requests.exceptions.RequestException as e:
-        logger.exception("Gemini API 네트워크 에러")
-        return Response(
-            {"detail": f"네트워크 오류: {str(e)}"},
-            status=status.HTTP_502_BAD_GATEWAY
-        )
+    data = r.json()
+    reply = extract_reply_from_response(data)
+
+    if not reply:
+        logger.error(f"❌ 빈 응답 수신: {json.dumps(data, ensure_ascii=False)}")
+        reply = "답변을 생성하지 못했습니다."
+
+    # ✅ 반드시 항상 Response 반환
+    return Response({
+        "reply": reply,
+        "suggestions": ["효능", "복용법", "주의사항", "부작용"],
+        "drug": {"id": drug.id, "name": drug.name},
+    })
 
 
-    except Exception as e:
-        logger.exception(f"예상치 못한 오류 - Drug ID: {pk}")
-        return Response(
-            {"detail": "서버 내부 오류", "error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-        
+
         
 
-
+# ai 글 요약
 
 
 @api_view(['GET'])
@@ -527,8 +458,7 @@ def drug_ai_search(request):
         "results": serializer.data
     })
 
-
-
+# qr 코드
 
 @api_view(['GET'])
 def generate_drug_qr(request, drug_id):

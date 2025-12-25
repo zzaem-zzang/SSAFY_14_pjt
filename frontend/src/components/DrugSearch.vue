@@ -11,7 +11,7 @@
         <span class="radio-label">증상</span>
       </label>
     </div>
-    
+
     <div class="search-bar">
       <input v-model="keyword" :placeholder="searchType === 'drug'
         ? '약 이름 (예: 타이레놀)'
@@ -44,7 +44,7 @@
       <div class="drug-card" v-for="drug in drugs" :key="drug.id" @click="goDetail(drug.id)">
         <!-- ⭐ 낱알 이미지 -->
         <div class="image-wrap">
-          <img :src="drug.image || drug.image_url || placeholder" @error="onImgError" />
+          <img :src="resolveImage(drug.image)" @error="onImgError" />
         </div>
         <div class="card-header">
           <h3>{{ drug.name }}</h3>
@@ -79,8 +79,12 @@ const searchType = ref('drug') // 'drug' | 'symptom'
 const route = useRoute()
 
 onMounted(() => {
-  if (route.query.keyword) {
-    keyword.value = route.query.keyword
+  const { keyword: q, type, order: o } = route.query
+
+  if (q) {
+    keyword.value = q
+    searchType.value = type || 'drug'
+    order.value = o || 'default'
     search()
   }
 })
@@ -93,9 +97,25 @@ const setOrder = (value) => {
   order.value = value
   search()
 }
+const resolveImage = (imagePath) => {
+  if (!imagePath) return placeholder
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+  return `${base}${imagePath}`   // /media/...
+}
+
 
 const search = async () => {
   if (!keyword.value.trim()) return
+
+  // ✅ URL에 검색 상태 저장
+  router.push({
+    path: route.path,
+    query: {
+      keyword: keyword.value,
+      type: searchType.value,
+      order: order.value,
+    }
+  })
 
   loading.value = true
   searched.value = true
@@ -104,7 +124,6 @@ const search = async () => {
   try {
     let res
 
-    // 🔹 약 이름 검색
     if (searchType.value === 'drug') {
       res = await api.get('/drugs/', {
         params: {
@@ -115,19 +134,15 @@ const search = async () => {
       drugs.value = res.data || []
     }
 
-    // 🔹 🧠 자연어 증상 검색
     if (searchType.value === 'symptom') {
       res = await api.get('/drugs/ai-search/', {
-        params: {
-          q: keyword.value
-        }
+        params: { q: keyword.value }
       })
       drugs.value = res.data.results || []
     }
 
   } catch (err) {
     errorMessage.value =
-      err.response?.data?.message ||
       err.response?.data?.detail ||
       '검색 중 오류가 발생했습니다.'
   } finally {
@@ -135,14 +150,18 @@ const search = async () => {
   }
 }
 
+
 const goDetail = (id) => {
   router.push({
     path: `/drugs/${id}`,
     query: {
       keyword: keyword.value,
+      type: searchType.value,
+      order: order.value
     }
   })
 }
+
 </script>
 
 <style scoped>
@@ -155,6 +174,7 @@ const goDetail = (id) => {
   display: flex;
   gap: 24px;
   margin-bottom: 16px;
+
 }
 
 .radio-option {
@@ -173,12 +193,14 @@ const goDetail = (id) => {
   /* 라디오 버튼 테두리 강조 */
   border: 2px solid #4f46e5;
   appearance: auto;
+  color: white;
 }
 
 .radio-label {
   font-size: 1rem;
   font-weight: 600;
-  color: #1e293b; /* 진한 색상으로 변경 */
+  color: white;
+  /* 진한 색상으로 변경 */
   cursor: pointer;
 }
 
@@ -337,6 +359,8 @@ input:focus {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+
+
 }
 
 .sort-bar button {
@@ -373,7 +397,9 @@ input:focus {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 반응형 */
