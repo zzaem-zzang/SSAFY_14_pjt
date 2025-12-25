@@ -35,6 +35,8 @@ onBeforeUnmount(() => {
     splineApp = null
   }
 })
+
+
 </script>
 
 <style scoped>

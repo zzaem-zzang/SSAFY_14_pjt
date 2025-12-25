@@ -2,39 +2,65 @@ from dotenv import load_dotenv
 import os
 from pathlib import Path
 
+# ========================
+# Base & Env
+# ========================
+
+# 프로젝트 루트 디렉토리
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env 파일 로드
 load_dotenv(BASE_DIR / ".env")
 
+# Django 시크릿 키 (환경변수 없으면 로컬 테스트용 기본값 사용)
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-local-test-key')
+
+# 외부 API 키들
 E_DRUG_API_KEY = os.getenv('E_DRUG_API_KEY')
 GMS_KEY = os.getenv("GMS_KEY")
 
+# OpenAI 호환 API Base URL (SSAFY GMS 프록시)
 OPENAI_BASE_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1"
-# Security: do NOT print secret values (SECRET_KEY, API keys) to logs or stdout.
-# Keep them in a local `.env` (ignored by git) or a secret manager in production.
-
-
 
 DEBUG = True
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+
+
+# ========================
+# Media
+# 미디어 파일 설정
+# ========================
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# ========================
+# Logging
+# ========================
+# 로그 설정
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    # 로그 포맷 정의
     'formatters': {
         'verbose': {
             'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
     },
+    # 콘솔 출력 핸들러
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
     },
+    # 기본(root) 로거 설정
     'root': {
         'handlers': ['console'],
         'level': 'DEBUG',
     },
+     # django 로거 설정
     'loggers': {
         'django': {
             'handlers': ['console'],
@@ -44,33 +70,42 @@ LOGGING = {
     },
 }
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
-
-# Application definition
-
+# 허용 호스트
+# ========================
+# Applications
+# ========================
 INSTALLED_APPS = [
-    # Django 기본
+    # Django 기본 앱
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # 외부 라이브러리
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+
+     # 로컬 앱
     'accounts',
     'posts',
     'ingredients.apps.IngredientsConfig',
 ]
+
+# 커스텀 User 모델 사용
 AUTH_USER_MODEL = 'accounts.User'
 
+
+# ========================
+# Middleware
+# ========================
 MIDDLEWARE = [
+    # CORS 처리
     'corsheaders.middleware.CorsMiddleware',
+
+    # Django 기본 미들웨어
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -78,13 +113,23 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
 ]
+
+# 모든 Origin 허용
 CORS_ALLOW_ALL_ORIGINS = True
 
 
+# ========================
+# URLs / WSGI
+# ========================
 ROOT_URLCONF = 'backend.urls'
+WSGI_APPLICATION = 'backend.wsgi.application'
 
+
+# ========================
+# Templates
+# ========================
+# 템플릿 설정
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -100,12 +145,10 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'backend.wsgi.application'
 
-
+# ========================
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
+# ========================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -114,48 +157,37 @@ DATABASES = {
 }
 
 
+# ========================
+# Auth / Password
+# ========================
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
+# ========================
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
+# ========================
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
+# ========================
+# Static
+# ========================
 STATIC_URL = 'static/'
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
+# ========================
+# DRF
+# ========================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
