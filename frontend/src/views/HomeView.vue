@@ -131,9 +131,21 @@ const searchByCategory = (keyword) => {
   height: 100%;
 }
 
+/* 1. 컨텐츠 레이어 전체가 마우스를 통과시키도록 설정 */
 .content-layer {
   position: relative;
   z-index: 1;
+  pointer-events: none; /* 이 속성이 핵심입니다! */
+}
+
+/* 2. 하지만 내부의 실제 클릭이 필요한 요소들은 다시 마우스를 인식하게 설정 */
+.search-container,
+.scroll-indicator,
+.popular-container,
+.hero-disclaimer,
+.drug-item,
+.show-more-btn {
+  pointer-events: auto; /* 버튼, 검색창 등은 다시 클릭 가능하게 */
 }
 
 /* ===== 히어로 섹션 (검색창 포함) ===== */

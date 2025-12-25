@@ -51,6 +51,8 @@ logger = logging.getLogger(__name__)
 # Gemini 이미지 생성 엔드포인트
 GMS_GEMINI_IMAGE_URL = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent"
 GMS_OPENAI_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions"
+
+
 # gpt 호출 함수
 def call_gpt_for_drug_summary(drug):
     developer_msg = """
@@ -100,7 +102,7 @@ def call_gpt_for_drug_summary(drug):
 
 
 # ================================
-# 💬 약 댓글 작성 (로그인 필수)
+#  약 댓글 작성 (로그인 필수)
 # ================================
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -125,7 +127,7 @@ def create_drug_comment(request, pk):
 
 
 # ================================
-# 📄 약 상세 조회 (조회수 포함)
+#  약 상세 조회 (조회수 포함)
 # ================================
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -137,7 +139,7 @@ def drug_detail(request, pk):
     """
     drug = get_object_or_404(Drug, pk=pk)
 
-    # ⭐ 조회수 증가
+    #  조회수 증가
     Drug.objects.filter(pk=pk).update(
         view_count=F('view_count') + 1
     )
@@ -267,7 +269,7 @@ def drug_list(request):
         )
     )
 
-    # ⭐⭐⭐ 약 이름 필터링 핵심 ⭐⭐⭐
+    # 약 이름 필터링 핵심 
     if search:
         drugs = drugs.filter(name__icontains=search)
 

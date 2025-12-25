@@ -1,20 +1,26 @@
 # ingredients/utils.py
 import requests
+import json
+from pathlib import Path
+
 from django.conf import settings
-from .models import Drug
 from django.db import connection
 from django.db.models import Q
-import json
+from django.core.files.base import ContentFile
 
-from pathlib import Path
+from .models import Drug
+
 
 BASE_URL = "https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList"
 GMS_OPENAI_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions"
 
-# 전체 약 가져오기
+
+# ============================
+# e약은on API 연동
+# ============================
 def fetch_all_drugs_from_api():
     """
-    e약은on API에서 전체 약품 목록 가져오기 (페이지 순회)
+    e약은on API에서 전체 의약품 목록을 페이지 단위로 순회하여 가져옴
     """
     page = 1
     all_items = []
@@ -29,12 +35,14 @@ def fetch_all_drugs_from_api():
 
         response = requests.get(BASE_URL, params=params)
 
+        # API 요청 실패 시 예외 발생
         if response.status_code != 200:
             raise Exception(f"API 요청 실패: {response.status_code}")
 
         data = response.json()
         items = data.get("body", {}).get("items", [])
 
+        # 더 이상 데이터가 없으면 종료
         if not items:
             break
 
@@ -44,13 +52,19 @@ def fetch_all_drugs_from_api():
     return all_items
 
 
-# db 캐싱 함수
-
-
+# ============================
+# DB 캐싱
+# ============================
 def cache_drugs_on_startup():
+    """
+    서버 시작 시 Drug 테이블이 비어있으면
+    e약은on API에서 데이터를 가져와 DB에 캐싱
+    """
+    # 테이블이 아직 생성되지 않았으면 종료
     if 'ingredients_drug' not in connection.introspection.table_names():
         return
 
+    # 이미 데이터가 있으면 재수집하지 않음
     if Drug.objects.exists():
         print("✅ Drug cache already exists")
         return
@@ -68,18 +82,22 @@ def cache_drugs_on_startup():
             image_url=d.get("itemImage"),
         )
 
-        # 🔥 이미지 미리 저장
+        # 🔥 외부 이미지 URL이 있으면 이미지 파일로 저장
         if drug.image_url:
             download_and_save_image(drug, drug.image_url)
 
     print(f"✅ Drug cache completed ({len(drugs)} items)")
 
 
-
-
-
-## 키워드 추출
+# ============================
+# AI 기반 키워드 추출
+# ============================
 def extract_keywords_with_ai(text):
+    """
+    사용자 자연어 문장에서
+    - 일상 표현 → 의학적으로 표준화된 증상 키워드로 변환
+    - JSON 형식으로만 응답받음
+    """
     prompt = f"""
 너는 의료 NLP 시스템이야.
 
@@ -123,14 +141,21 @@ def extract_keywords_with_ai(text):
         timeout=15
     )
 
+    # HTTP 에러 발생 시 예외
     res.raise_for_status()
+
     content = res.json()["choices"][0]["message"]["content"]
 
+    # JSON 문자열 → dict → symptoms 리스트 반환
     return json.loads(content)["symptoms"]
 
+
+# ============================
+# 약 검색 로직
+# ============================
 def search_drugs_by_effect_keywords(keywords):
     """
-    effect 텍스트에 키워드가 포함된 약 검색
+    effect 텍스트에 키워드가 포함된 의약품 검색
     """
     q = Q()
     for k in keywords:
@@ -138,23 +163,24 @@ def search_drugs_by_effect_keywords(keywords):
 
     return Drug.objects.filter(q).distinct()
 
+
 def search_drugs_by_ai(text):
     """
     1. AI로 증상 키워드 추출
-    2. effect 기반으로 약 검색
+    2. effect 필드 기반으로 의약품 검색
     """
     keywords = extract_keywords_with_ai(text)
     drugs = search_drugs_by_effect_keywords(keywords)
     return drugs, keywords
 
 
-
-import requests
-from django.core.files.base import ContentFile
-
+# ============================
+# 이미지 다운로드
+# ============================
 def download_and_save_image(drug, image_url):
     """
-    외부 이미지 URL → 우리 서버에 저장
+    외부 이미지 URL을 다운로드하여
+    Drug.image 필드에 파일로 저장
     """
     try:
         res = requests.get(image_url, timeout=10)
